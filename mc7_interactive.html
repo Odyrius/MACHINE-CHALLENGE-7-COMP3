@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MC#7 · Solve a linear system with the inverse</title>
+<style>
+:root{--ink:#14161f;--mut:rgba(20,22,31,.62);--tint:#007aff;--ok:#1b8a43;--bad:#d62839;--glass:rgba(255,255,255,.2);--solid:rgba(255,255,255,.88);
+--edge:rgba(255,255,255,.55);--field:rgba(255,255,255,.42);--thumb:rgba(255,255,255,.95);--line:rgba(20,22,31,.12);--shadow:rgba(50,60,140,.2);--hi:rgba(255,255,255,.5);
+--wall:radial-gradient(60vmax 60vmax at 8% 0,#ffc2e0 0,transparent 60%),radial-gradient(55vmax 55vmax at 98% 8%,#a9cbff 0,transparent 60%),radial-gradient(65vmax 65vmax at 70% 100%,#cdb4ff 0,transparent 62%),#e6edff}
+@media (prefers-color-scheme:dark){:root{--ink:#f5f5f7;--mut:rgba(245,245,247,.62);--tint:#0a84ff;--ok:#30d158;--bad:#ff7a70;--glass:rgba(255,255,255,.08);--solid:rgba(34,36,56,.94);
+--edge:rgba(255,255,255,.2);--field:rgba(255,255,255,.1);--thumb:rgba(255,255,255,.26);--line:rgba(255,255,255,.14);--shadow:rgba(0,0,0,.45);--hi:rgba(255,255,255,.1);
+--wall:radial-gradient(55vmax 55vmax at 8% 0,#5b2a9e 0,transparent 60%),radial-gradient(50vmax 50vmax at 98% 10%,#0b4fb3 0,transparent 60%),radial-gradient(60vmax 60vmax at 70% 100%,#a02a6e 0,transparent 62%),#0a0c1a}}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:var(--wall) fixed;font:16px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:34px 5vw 60px}
+h1{font:700 clamp(1.7rem,4.5vw,2.4rem)/1.1 -apple-system,"SF Pro Display",system-ui,sans-serif;letter-spacing:-.025em;margin:0 0 8px}
+h1 em{font-style:normal;color:var(--tint)}
+.lead{color:var(--mut);margin:0 0 14px;max-width:62ch}
+.pill{display:inline-flex;gap:8px;align-items:center;padding:4px 13px;margin-bottom:18px;border-radius:999px;background:var(--field);border:1px solid var(--edge);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);font-size:.85rem}
+.pill::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--mut)}
+.pill[data-on=true]::before{background:var(--ok)}.pill[data-on=false]::before{background:#ff9f0a}
+.card{position:relative;overflow:hidden;background:var(--glass);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+ border:1px solid var(--edge);border-radius:24px;padding:20px 22px;margin:0 0 18px;
+ box-shadow:0 8px 32px var(--shadow),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.1)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85),transparent)}
+.card::after{content:'';position:absolute;top:0;left:0;width:1px;height:100%;background:linear-gradient(180deg,rgba(255,255,255,.8),transparent,rgba(255,255,255,.3))}
+@supports not (backdrop-filter:blur(1px)){.card{background:var(--solid)}}
+@media (prefers-reduced-transparency:reduce){.card,.pill{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--solid)}}
+h2{font-size:1.08rem;font-weight:600;margin:0 0 14px;display:flex;gap:10px;align-items:center}
+h2 .n{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--tint);color:#fff;font-size:.85rem;font-weight:700}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;background:var(--field);border:1px solid var(--edge);border-radius:12px}
+.seg button{border:0;background:transparent;color:var(--ink);padding:6px 13px;border-radius:9px;font:inherit;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--thumb);font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.14)}
+.btn{border:1px solid var(--edge);background:var(--field);color:var(--ink);border-radius:999px;padding:7px 15px;font:inherit;cursor:pointer;transition:transform .12s}
+.btn:hover{background:var(--thumb)}.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--tint);border-color:transparent;color:#fff;font-weight:600}.btn.primary:hover{filter:brightness(1.1)}
+:focus-visible{outline:2px solid var(--tint);outline-offset:2px}
+.sp{flex:1}
+.size{display:flex;align-items:center;gap:8px}
+.size input{width:78px}
+input,textarea{color:var(--ink);background:var(--field);border:1px solid var(--edge);border-radius:10px;font:1rem ui-monospace,SFMono-Regular,Menlo,monospace}
+input{padding:7px 8px}
+input[aria-invalid=true]{border-color:var(--bad);background:rgba(255,69,58,.14)}
+.tag{font-size:.85rem;color:var(--mut);border:1px solid var(--edge);border-radius:999px;padding:2px 11px}
+.eqs{overflow-x:auto;padding-bottom:4px}
+.eq{display:flex;align-items:center;gap:6px;margin:6px 0;white-space:nowrap}
+.eq input{width:64px;text-align:center}
+.eq .op{color:var(--mut);padding:0 2px}
+.cg{border-collapse:separate;border-spacing:3px}.cg th{font-size:.8rem;color:var(--mut);font-weight:500}
+.cg input{width:54px;padding:5px 3px;text-align:center;font-size:.85rem;border-radius:8px}
+details{margin-top:12px;color:var(--mut)}summary{cursor:pointer}
+textarea{width:100%;margin-top:8px;min-height:140px;resize:vertical;font-size:.9rem;line-height:1.4;padding:10px;white-space:pre}
+.hint{color:var(--mut);margin:6px 0 0;font-size:.92rem}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.box{max-height:380px;max-width:100%;min-width:0;overflow:auto}
+table.m{border-collapse:collapse;border-left:2px solid var(--ink);border-right:2px solid var(--ink)}
+table.m td{padding:3px 11px;text-align:right;font:1rem ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+.lab{font-size:1.1rem;font-weight:500}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}.mut{color:var(--mut)}
+.ans{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;max-height:360px;overflow:auto}
+.ans div{background:var(--field);border:1px solid var(--edge);border-left:4px solid var(--tint);padding:8px 16px;border-radius:14px;font:600 1.4rem -apple-system,system-ui,sans-serif}
+.ans.dense div{font-size:1rem;padding:4px 11px}
+.ans small{display:block;color:var(--mut);font:.8rem system-ui}
+.vt{border-collapse:collapse;font:.9rem ui-monospace,SFMono-Regular,Menlo,monospace}.vt th,.vt td{padding:3px 12px;text-align:right;border-bottom:1px solid var(--line)}
+.chk{list-style:none;padding:0;margin:0 0 10px}.big{font-size:1.1rem}
+ol{margin:8px 0 0;padding-left:22px;font:.9rem ui-monospace,SFMono-Regular,Menlo,monospace;max-height:280px;overflow:auto}
+.msg{color:var(--bad);margin:8px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Solve a linear system with <em>A<sup>-1</sup></em></h1>
+  <p class="lead">MC#7 · Any size from 1×1 to 24×24. Type, paste from a spreadsheet, or randomize the equations. The page builds the matrix equation, finds the inverse, checks it, and solves [x] = A<sup>-1</sup>B. Fractions like <code>3/2</code> and decimals work.</p>
+
+  <span class="pill" id="api" data-on="">Connecting to the Python API…</span>
+
+  <section class="card" aria-labelledby="in-h">
+    <h2 id="in-h">Your linear system</h2>
+    <div class="bar">
+      <label class="size">Size n × n <input type="number" id="size" min="1" max="24" value="3"></label>
+      <div class="seg" id="chips" role="group" aria-label="Common sizes">
+        <button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button><button data-n="5">5</button><button data-n="8">8</button><button data-n="10">10</button><button data-n="16">16</button><button data-n="24">24</button>
+      </div>
+      <span class="tag" id="mode"></span>
+      <span class="mut" id="sizeNote"></span>
+    </div>
+    <div class="bar" id="presets">
+      <button class="btn" data-p="sample">Sample 3×3</button>
+      <button class="btn" data-p="two">Sample 2×2</button>
+      <button class="btn" data-p="sing">Singular example</button>
+      <button class="btn primary" data-p="randall">Randomize size &amp; content</button><button class="btn" data-p="rand">Randomize content</button>
+      <button class="btn" data-p="clear">Clear</button>
+    </div>
+    <div class="eqs" id="form"></div>
+    <details id="textBox">
+      <summary>Optional: paste the whole system as text</summary>
+      <textarea id="txt" spellcheck="false" aria-label="System as text, one equation per line" placeholder="One equation per line: the coefficients, then the constant&#10;2 1 -1 8&#10;-3 -1 2 -11&#10;-2 1 2 -3"></textarea>
+      <p class="hint">Separate numbers with spaces, tabs or commas, so you can paste straight from a spreadsheet. The size is detected from the number of lines.</p>
+    </details>
+    <p class="msg" id="err" role="alert"></p>
+  </section>
+
+  <div id="out" aria-live="polite"></div>
+</div>
+
+<script>
+const MAX_N=24, EXACT_MAX=10, EQ_STYLE=8;
+
+/* ---------- exact rationals (BigInt) for n <= EXACT_MAX ---------- */
+const babs=a=>a<0n?-a:a;
+const gcd=(a,b)=>{a=babs(a);b=babs(b);while(b){[a,b]=[b,a%b]}return a};
+const fr=(n,d=1n)=>{n=BigInt(n);d=BigInt(d);if(d<0n){n=-n;d=-d}const g=gcd(n,d)||1n;return{n:n/g,d:d/g}};
+const add=(a,b)=>fr(a.n*b.d+b.n*a.d,a.d*b.d), sub=(a,b)=>fr(a.n*b.d-b.n*a.d,a.d*b.d);
+const mul=(a,b)=>fr(a.n*b.n,a.d*b.d), div=(a,b)=>fr(a.n*b.d,a.d*b.n);
+const isZ=a=>a.n===0n, isOne=a=>a.n===1n&&a.d===1n, ZERO=fr(0), ONE=fr(1);
+const str=a=>(a.d===1n?a.n.toString():a.n+'/'+a.d).replace('-','−');
+const dec=a=>{const q=Number(a.n)/Number(a.d);return a.d===1n||!isFinite(q)?'':'≈ '+q.toFixed(4).replace('-','−')};
+
+const NUM=/^([+-]?\d*\.?\d+)(?:\/(\d*\.?\d+))?$/;
+const clean=s=>s.trim().replace('−','-');
+function parseX(s){
+  const m=clean(s).match(NUM); if(!m) return null;
+  const t=x=>{const neg=x[0]==='-',u=x.replace(/^[+-]/,''),k=(u.split('.')[1]||'').length;
+    const i=BigInt(u.replace('.',''));return fr(neg?-i:i,10n**BigInt(k))};
+  const a=t(m[1]); if(m[2]===undefined) return a;
+  const b=t(m[2]); return isZ(b)?null:div(a,b);
+}
+function parseF(s){
+  const m=clean(s).match(NUM); if(!m) return null;
+  const a=Number(m[1]); if(m[2]===undefined) return a;
+  const b=Number(m[2]); return b===0?null:a/b;
+}
+
+const eye=n=>Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?ONE:ZERO));
+const matmul=(P,Q)=>P.map(r=>Q[0].map((_,j)=>r.reduce((s,v,k)=>add(s,mul(v,Q[k][j])),ZERO)));
+const same=(P,Q)=>P.every((r,i)=>r.every((v,j)=>v.n===Q[i][j].n&&v.d===Q[i][j].d));
+
+function solveExact(A,B){
+  const n=A.length, I=eye(n), log=[];
+  let M=A.map((r,i)=>[...r,...I[i]]), det=ONE;
+  for(let c=0;c<n;c++){
+    let p=-1; for(let r=c;r<n;r++) if(!isZ(M[r][c])){p=r;break}
+    if(p<0){log.push(`No pivot in column ${c+1}, so A is singular.`);return{mode:'exact',n,A,B,inv:null,log,det:ZERO}}
+    if(p!==c){[M[c],M[p]]=[M[p],M[c]];det=mul(det,fr(-1));log.push(`R${c+1} ↔ R${p+1}`)}
+    const pv=M[c][c]; det=mul(det,pv);
+    if(!isOne(pv)){M[c]=M[c].map(v=>div(v,pv));log.push(`R${c+1} → R${c+1} ÷ ${str(pv)}`)}
+    for(let r=0;r<n;r++) if(r!==c&&!isZ(M[r][c])){
+      const f=M[r][c]; M[r]=M[r].map((v,j)=>sub(v,mul(f,M[c][j])));
+      log.push(`R${r+1} → R${r+1} − (${str(f)})·R${c+1}`);
+    }
+  }
+  const inv=M.map(r=>r.slice(n)), left=matmul(inv,A), right=matmul(A,inv);
+  return{mode:'exact',n,A,B,inv,log,det,left,right,ok:same(left,I)&&same(right,I),x:matmul(inv,B.map(v=>[v]))};
+}
+
+/* ---------- double precision, partial pivoting, for n up to 100 ---------- */
+function matmulF(P,Q){
+  const n=P.length,m=Q[0].length,k=Q.length,R=Array.from({length:n},()=>new Array(m).fill(0));
+  for(let i=0;i<n;i++){const Ri=R[i],Pi=P[i];for(let t=0;t<k;t++){const p=Pi[t];if(p===0)continue;const Qt=Q[t];for(let j=0;j<m;j++)Ri[j]+=p*Qt[j]}}
+  return R;
+}
+const dev=M=>{let e=0;M.forEach((r,i)=>r.forEach((v,j)=>{e=Math.max(e,Math.abs(v-(i===j?1:0)))}));return e};
+const norm1=M=>{let b=0;for(let j=0;j<M.length;j++){let s=0;for(let i=0;i<M.length;i++)s+=Math.abs(M[i][j]);b=Math.max(b,s)}return b};
+function solveFloat(A,B){
+  const n=A.length; let scale=0; A.forEach(r=>r.forEach(v=>{scale=Math.max(scale,Math.abs(v))}));
+  const M=A.map((r,i)=>{const row=r.concat(new Array(n).fill(0));row[n+i]=1;return row});
+  for(let c=0;c<n;c++){
+    let p=c; for(let r=c+1;r<n;r++) if(Math.abs(M[r][c])>Math.abs(M[p][c])) p=r;
+    if(Math.abs(M[p][c])<=1e-12*(scale||1)) return{mode:'float',n,A,B,inv:null,why:`No usable pivot in column ${c+1}`};
+    [M[c],M[p]]=[M[p],M[c]];
+    const Mc=M[c],pv=Mc[c]; for(let j=0;j<2*n;j++) Mc[j]/=pv;
+    for(let r=0;r<n;r++){if(r===c)continue;const f=M[r][c];if(f===0)continue;const Mr=M[r];for(let j=0;j<2*n;j++)Mr[j]-=f*Mc[j]}
+  }
+  const inv=M.map(r=>r.slice(n)),left=matmulF(inv,A),right=matmulF(A,inv),x=matmulF(inv,B.map(v=>[v]));
+  let res=0; matmulF(A,x).forEach((r,i)=>{res=Math.max(res,Math.abs(r[0]-B[i]))});
+  const e1=dev(left),e2=dev(right);
+  return{mode:'float',n,A,B,inv,left,right,x,e1,e2,res,cond:norm1(A)*norm1(inv),ok:Math.max(e1,e2)<1e-6};
+}
+
+/* ---------- rendering ---------- */
+const subs='₀₁₂₃₄₅₆₇₈₉';
+const xn=i=>'x'+String(i+1).replace(/\d/g,d=>subs[d]);
+const fmtF=v=>{const a=Math.abs(v);if(a<1e-10)return'0';return((a>=1e5||a<1e-3)?v.toExponential(2):String(+v.toFixed(4))).replace('-','−')};
+const mat=(M,f)=>`<div class="box"><table class="m" role="presentation">${M.map(r=>'<tr>'+r.map(v=>`<td>${typeof v==='string'?v:f(v)}</td>`).join('')+'</tr>').join('')}</table></div>`;
+const lab=s=>`<span class="lab">${s}</span>`;
+const sci=v=>v===0?'0':v.toExponential(1).replace('-','−');
+
+function localVer(r){
+  const ex=r.mode==='exact', n=r.n, I=ex?eye(n):null;
+  const rows=r.A.map((row,i)=>{
+    if(ex){const l=row.reduce((s,v,j)=>add(s,mul(v,r.x[j][0])),ZERO);return{l:str(l),b:str(r.B[i]),ok:l.n===r.B[i].n&&l.d===r.B[i].d}}
+    const l=row.reduce((s,v,j)=>s+v*r.x[j][0],0);return{l:fmtF(l),b:fmtF(r.B[i]),ok:Math.abs(l-r.B[i])<=1e-8*Math.max(1,Math.abs(r.B[i]))}});
+  const hits=rows.filter(q=>q.ok).length;
+  const okL=ex?same(r.left,I):r.e1<1e-6, okR=ex?same(r.right,I):r.e2<1e-6;
+  const okI=ex?same(matmul(r.left,r.x),r.x):matmulF(r.left,r.x).every((q,i)=>Math.abs(q[0]-r.x[i][0])<=1e-6*Math.max(1,Math.abs(r.x[i][0])));
+  return{rows,okL,okR,okI};
+}
+function verifyHTML(r){
+  const ex=r.mode==='exact', n=r.n, V=r.ver||localVer(r), rows=V.rows, okL=V.okL, okR=V.okR, okI=V.okI, hits=rows.filter(q=>q.ok).length;
+  const items=[[true,ex?'A is invertible: det(A) ≠ 0':'A is invertible: a pivot was found in every column'],
+    [hits===n,`Substituting x into the equations gives Ax = B (${hits} of ${n} equations match)`],
+    [okL,'A⁻¹A = Iₙ'],[okR,'AA⁻¹ = Iₙ'],[okI,'Iₙx = x: the identity leaves the solution unchanged']];
+  const all=items.every(q=>q[0]);
+  return `<section class="card"><h2><span class="n">5</span>Verification</h2><ul class="chk">${items.map(q=>`<li class="${q[0]?'ok':'bad'}">${q[0]?'✔':'✘'} ${q[1]}</li>`).join('')}</ul>
+   <p class="big ${all?'ok':'bad'}">${all?'✔ The solution is valid and the identity matrix stays the same.':'✘ Verification failed. Recheck your entries.'}</p>
+   <details${n<=10?' open':''}><summary>Equation-by-equation substitution</summary><div class="box"><table class="vt"><tr><th>Row</th><th>Σ aᵢⱼxⱼ</th><th>bᵢ</th><th></th></tr>${rows.map((q,i)=>`<tr><td>${i+1}</td><td>${q.l}</td><td>${q.b}</td><td class="${q.ok?'ok':'bad'}">${q.ok?'✔':'✘'}</td></tr>`).join('')}</table></div></details></section>`;
+}
+function report(r){
+  const n=r.n, f=r.mode==='exact'?str:fmtF, col=v=>v.map(x=>[x]);
+  let h=`<section class="card"><h2><span class="n">1</span>Matrix equation&nbsp; Ax = B</h2>
+   <div class="row">${lab('A')}${mat(r.A,f)}${lab('x')}${mat(Array.from({length:n},(_,i)=>[xn(i)]),f)}${lab('=')}${lab('B')}${mat(col(r.B),f)}</div></section>`;
+  if(!r.inv){
+    return h+`<section class="card"><h2><span class="n">2</span>Inverse A<sup>-1</sup></h2>
+     <p class="bad">A is singular${r.mode==='exact'?' (det A = 0)':' (numerically)'}, so A<sup>-1</sup> does not exist.</p>
+     <p>${r.why?r.why+'. ':''}The inverse method cannot solve this system. Change a coefficient so the rows are independent, or solve it by row reduction instead.</p></section>`;
+  }
+  h+=`<section class="card"><h2><span class="n">2</span>Identify the inverse A<sup>-1</sup></h2><div class="row">${lab('A<sup>-1</sup> =')}${mat(r.inv,f)}</div>`;
+  if(r.mode==='exact') h+=`<p class="mut" style="margin:10px 0 0">det(A) = ${str(r.det)}</p>
+   <details><summary>Show Gauss–Jordan row operations on [A | I]</summary><ol>${r.log.map(s=>`<li>${s}</li>`).join('')||'<li>A is already the identity.</li>'}</ol></details>`;
+  else h+=`<p class="mut" style="margin:10px 0 0">Gauss–Jordan with partial pivoting in double precision, shown to 4 decimals. Condition number ≈ ${sci(r.cond)}.</p>`+
+   (r.cond>1e8?`<p class="bad">This matrix is ill-conditioned, so the digits of A<sup>-1</sup> and x may be unreliable.</p>`:'');
+  h+=`</section>`;
+  h+=`<section class="card"><h2><span class="n">3</span>Check&nbsp; A<sup>-1</sup>A = AA<sup>-1</sup> = I<sub>n</sub></h2>`;
+  if(r.mode==='exact') h+=`<div class="row">${lab('A<sup>-1</sup>A =')}${mat(r.left,f)}${lab('AA<sup>-1</sup> =')}${mat(r.right,f)}</div>`;
+  else{
+    h+=`<p class="mut">Largest difference from the identity: A<sup>-1</sup>A is ${sci(r.e1)}, AA<sup>-1</sup> is ${sci(r.e2)}. Anything below 1e−6 counts as the identity.</p>`;
+    if(n<=15) h+=`<details><summary>Show both products</summary><div class="row">${lab('A<sup>-1</sup>A =')}${mat(r.left,f)}${lab('AA<sup>-1</sup> =')}${mat(r.right,f)}</div></details>`;
+  }
+  h+=`<p class="${r.ok?'ok':'bad'}">${r.ok?'✔ Both products equal the identity matrix.':'✘ A product is not the identity. Recheck your entries.'}</p></section>`;
+  h+=`<section class="card"><h2><span class="n">4</span>Solve&nbsp; [x] = A<sup>-1</sup>B</h2>
+   <div class="row">${lab('A<sup>-1</sup>')}${mat(r.inv,f)}${lab('B')}${mat(col(r.B),f)}${lab('=')}${mat(r.x,f)}</div>
+   <div class="ans${n>10?' dense':''}">${r.x.map((v,i)=>`<div>${xn(i)} = ${f(v[0])}${r.mode==='exact'?`<small>${dec(v[0])||'exact'}</small>`:''}</div>`).join('')}</div>`;
+  if(r.mode==='float') h+=`<p class="mut">Largest error of Ax − B: ${sci(r.res)}</p>`;
+  return h+'</section>'+verifyHTML(r);
+}
+
+/* ---------- bridge to the FastAPI server (mc7_api.py) ---------- */
+const API=location.protocol.startsWith('http')?'':'http://127.0.0.1:8000';
+let seq=0,ctl=null;
+const setApi=on=>{const p=$('api');p.dataset.on=String(on);p.textContent=on?'Python API connected':'API offline · using the built-in browser solver'};
+async function callAPI(){
+  if(ctl)ctl.abort(); ctl=new AbortController();
+  const r=await fetch(API+'/api/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({A,B}),signal:ctl.signal});
+  if(r.status===422){const j=await r.json().catch(()=>({}));const e=new Error(typeof j.detail==='string'?j.detail:'The API could not read this system.');e.api=true;throw e}
+  if(!r.ok) throw new Error('API returned '+r.status); /* 404/405/5xx: not our server, so fall back */
+  return r.json();
+}
+function fromAPI(j){
+  const exact=j.mode==='exact', P=exact?parseX:(v=>v), PI=exact?parseX:parseF, cv=M=>M&&M.map(r=>r.map(P));
+  const r={...j,A:A.map(r=>r.map(PI)),B:B.map(PI),inv:cv(j.inv),left:cv(j.left),right:cv(j.right),x:cv(j.x)};
+  if(exact) r.det=parseX(j.det);
+  if(j.ver) r.ver={...j.ver,rows:j.ver.rows.map(q=>({ok:q.ok,l:exact?str(parseX(q.l)):fmtF(q.l),b:exact?str(parseX(q.b)):fmtF(q.b)}))};
+  return r;
+}
+async function randomFrom(n){
+  try{const r=await fetch(API+'/api/random'+(n?'?n='+n:''));if(!r.ok)throw 0;const j=await r.json();load({a:j.a,b:j.b})}
+  catch(e){load(randomSys(n||2+Math.floor(Math.random()*(MAX_N-1))))}
+}
+
+/* ---------- input handling ---------- */
+function parseText(t){
+  const rows=t.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>l.split(/[\s,;]+/).filter(Boolean)), m=rows.length;
+  if(!m) return{err:'Type or paste at least one equation.'};
+  if(m>MAX_N) return{err:`That is ${m} equations. The maximum is ${MAX_N}.`};
+  for(let i=0;i<m;i++) if(rows[i].length!==m+1)
+    return{err:`Line ${i+1} has ${rows[i].length} numbers. A ${m}×${m} system needs ${m+1} per line: the coefficients, then the constant.`};
+  return{A:rows.map(r=>r.slice(0,m)),B:rows.map(r=>r[m])};
+}
+function randomSys(n){
+  const R=(lo,hi)=>lo+Math.floor(Math.random()*(hi-lo+1)),a=[],x=Array.from({length:n},()=>R(-9,9));
+  if(n<=EXACT_MAX){ /* A = L·U with unit triangles: det = 1, so A⁻¹ and x stay whole numbers */
+    const Z=()=>Array.from({length:n},()=>new Array(n).fill(0)),L=Z(),U=Z();
+    for(let i=0;i<n;i++){L[i][i]=U[i][i]=1;for(let j=0;j<i;j++){L[i][j]=R(-1,1);U[j][i]=R(-1,1)}}
+    for(let i=0;i<n;i++){a.push([]);for(let j=0;j<n;j++){let s=0;for(let k=0;k<n;k++)s+=L[i][k]*U[k][j];a[i].push(s)}}
+  }else for(let i=0;i<n;i++){let s=0;const r=[];for(let j=0;j<n;j++){const v=R(-9,9);r.push(v);if(j!==i)s+=Math.abs(v)}r[i]=s+1+R(0,5);a.push(r)}
+  return{a,b:a.map(r=>r.reduce((s,v,j)=>s+v*x[j],0))};
+}
+const PRESETS={
+  sample:{a:[[2,1,-1],[-3,-1,2],[-2,1,2]],b:[8,-11,-3]},
+  two:{a:[[2,1],[5,3]],b:[3,8]},
+  sing:{a:[[1,2],[2,4]],b:[3,6]}
+};
+
+let N=3,A=[],B=[],tmr;
+const $=id=>document.getElementById(id);
+function setSize(n){
+  const nA=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>(A[i]&&A[i][j]!==undefined)?A[i][j]:'0'));
+  const nB=Array.from({length:n},(_,i)=>B[i]!==undefined?B[i]:'0');
+  N=n;A=nA;B=nB;build();
+}
+function load(p){N=p.a.length;A=p.a.map(r=>r.map(String));B=p.b.map(String);build()}
+function syncText(){$('txt').value=A.map((r,i)=>r.concat(B[i]).join(' ')).join('\n')}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const gridHTML=()=>`<table class="cg"><thead><tr>${A.map((_,j)=>`<th>${xn(j)}</th>`).join('')}<th></th><th>B</th></tr></thead><tbody>${A.map((row,i)=>'<tr>'+row.map((v,j)=>`<td><input inputmode="decimal" aria-label="Row ${i+1}, coefficient of ${xn(j)}" data-r="${i}" data-c="${j}" value="${esc(v)}"></td>`).join('')+`<td class="lab">=</td><td><input inputmode="decimal" aria-label="Row ${i+1}, constant" data-r="${i}" data-c="b" value="${esc(B[i])}"></td></tr>`).join('')}</tbody></table>`;
+function build(skipText){
+  $('size').value=N;
+  document.querySelectorAll('#chips button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.n===N)));
+  $('mode').textContent=N<=EXACT_MAX?'Exact fractions':'Decimal, double precision';
+  $('form').innerHTML=N>EQ_STYLE?gridHTML():A.map((row,i)=>'<div class="eq">'+row.map((v,j)=>
+    `<input inputmode="decimal" aria-label="Row ${i+1}, coefficient of ${xn(j)}" data-r="${i}" data-c="${j}" value="${esc(v)}">${`<span class="lab">${xn(j)}</span>`}${j<N-1?'<span class="op">+</span>':''}`).join('')+
+    `<span class="op">=</span><input inputmode="decimal" aria-label="Row ${i+1}, constant" data-r="${i}" data-c="b" value="${esc(B[i])}"></div>`).join('');
+  if(!skipText) syncText();
+  compute();
+}
+async function compute(){
+  const exact=N<=EXACT_MAX, P=exact?parseX:parseF; let bad=null;
+  const pa=A.map((r,i)=>r.map((s,j)=>{const v=P(s);if(v===null&&!bad)bad=`Row ${i+1}, column ${j+1}`;return v}));
+  const pb=B.map((s,i)=>{const v=P(s);if(v===null&&!bad)bad=`Row ${i+1}, constant`;return v});
+  document.querySelectorAll('#form input').forEach(el=>{
+    const v=el.dataset.c==='b'?pb[+el.dataset.r]:pa[+el.dataset.r][+el.dataset.c];el.setAttribute('aria-invalid',String(v===null))});
+  $('err').textContent=bad?`${bad} is not a number. Use values like 3, -2, 1.5 or 3/4.`:'';
+  if(bad){seq++;if(ctl)ctl.abort();$('out').innerHTML='';return}
+  const mine=++seq;
+  try{
+    let r;
+    try{r=fromAPI(await callAPI());if(mine!==seq)return;setApi(true)}
+    catch(e){if(e.name==='AbortError')return;if(e.api){$('err').textContent=e.message;$('out').innerHTML='';return}
+      setApi(false);r=exact?solveExact(pa,pb):solveFloat(pa,pb)}
+    if(mine===seq)$('out').innerHTML=report(r);
+  }catch(e){$('err').textContent='Something went wrong: '+e.message}
+}
+function fromText(){
+  const r=parseText($('txt').value);
+  if(r.err){$('err').textContent=r.err;$('out').innerHTML='';return}
+  N=r.A.length;A=r.A;B=r.B;build(true);
+}
+if(typeof document!=='undefined'){
+  $('chips').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setSize(+b.dataset.n)});
+  $('size').addEventListener('change',()=>{
+    let v=parseInt($('size').value,10); if(!(v>=1)) v=N;
+    $('sizeNote').textContent=v>MAX_N?`The maximum is ${MAX_N}×${MAX_N}.`:''; setSize(Math.min(v,MAX_N));
+  });
+  $('presets').addEventListener('click',e=>{const p=e.target.dataset.p;if(!p)return;
+    if(p==='randall'){randomFrom()}
+    else if(p==='rand'){randomFrom(N<2?3:N)}
+    else if(p==='clear'){A=A.map(r=>r.map(()=>'0'));B=B.map(()=>'0');build()}
+    else load(PRESETS[p]);$('sizeNote').textContent=''});
+  $('form').addEventListener('input',e=>{const el=e.target,i=+el.dataset.r;if(el.dataset.r===undefined)return;
+    if(el.dataset.c==='b')B[i]=el.value;else A[i][+el.dataset.c]=el.value;syncText();compute()});
+  $('txt').addEventListener('input',()=>{clearTimeout(tmr);tmr=setTimeout(fromText,N>EXACT_MAX?250:0)});
+  $('form').addEventListener('paste',e=>{
+    const el=e.target,t=(e.clipboardData||window.clipboardData).getData('text');
+    const rows=t.split(/\r?\n/).filter(l=>l.trim()).map(l=>l.trim().split(/[\s,;]+/));
+    if(el.dataset.r===undefined||!rows.length||(rows.length<2&&rows[0].length<2))return;
+    e.preventDefault();
+    const r0=+el.dataset.r,c0=el.dataset.c==='b'?N:+el.dataset.c;
+    rows.forEach((row,di)=>row.forEach((v,dj)=>{const i=r0+di,j=c0+dj;if(i<N&&j<N)A[i][j]=v;else if(i<N&&j===N)B[i]=v}));
+    build();
+  });
+  load(PRESETS.sample);
+}
+</script>
+</body>
+</html>
