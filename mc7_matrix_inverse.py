@@ -36,29 +36,39 @@ def identity(n):
     return [[F(int(i == j)) for j in range(n)] for i in range(n)]
 
 
-def gauss_jordan_inverse(A):
-    """Row-reduce [A | I] -> [I | A^-1]. Returns (inverse or None, row-op log)."""
+def gauss_jordan_steps(A):
+    """Row-reduce [A | I]. Returns (inverse or None, steps, pivots, swaps).
+    steps[0] is the starting matrix; each later step is one row operation plus the matrix after it."""
     n = len(A)
     M = [row[:] + identity(n)[i] for i, row in enumerate(A)]
-    log = []
+    snap = lambda t, hi: {"t": t, "M": [r[:] for r in M], "hi": hi}
+    steps, pivots, swaps = [snap("Write [A | I]", None)], [], 0
     for c in range(n):
         p = next((r for r in range(c, n) if M[r][c] != 0), None)
         if p is None:
-            log.append(f"No pivot in column {c + 1}: A is singular.")
-            return None, log
+            steps.append(snap(f"No pivot in column {c + 1}: A is singular.", None))
+            return None, steps, pivots, swaps
         if p != c:
             M[c], M[p] = M[p], M[c]
-            log.append(f"R{c + 1} ↔ R{p + 1}")
+            swaps += 1
+            steps.append(snap(f"R{c + 1} ↔ R{p + 1}", c))
         pv = M[c][c]
+        pivots.append(pv)
         if pv != 1:
             M[c] = [v / pv for v in M[c]]
-            log.append(f"R{c + 1} → R{c + 1} ÷ {pv}")
+            steps.append(snap(f"R{c + 1} → R{c + 1} ÷ {pv}", c))
         for r in range(n):
             if r != c and M[r][c] != 0:
                 f = M[r][c]
                 M[r] = [a - f * b for a, b in zip(M[r], M[c])]
-                log.append(f"R{r + 1} → R{r + 1} − ({f})·R{c + 1}")
-    return [row[n:] for row in M], log
+                steps.append(snap(f"R{r + 1} → R{r + 1} − ({f})·R{c + 1}", r))
+    return [row[n:] for row in M], steps, pivots, swaps
+
+
+def gauss_jordan_inverse(A):
+    """Returns (inverse or None, list of row-operation texts)."""
+    inv, steps, _, _ = gauss_jordan_steps(A)
+    return inv, [s["t"] for s in steps[1:]]
 
 
 def determinant(A):
@@ -78,9 +88,10 @@ def determinant(A):
 
 
 def solve_with_inverse(A, B):
-    inv, log = gauss_jordan_inverse(A)
+    inv, steps, pivots, swaps = gauss_jordan_steps(A)
+    log = [s["t"] for s in steps[1:]]
     if inv is None:
-        return {"A": A, "B": B, "inv": None, "log": log}
+        return {"A": A, "B": B, "inv": None, "log": log, "steps": steps}
     n = len(A)
     I = identity(n)
     left, right = matmul(inv, A), matmul(A, inv)
@@ -91,7 +102,8 @@ def solve_with_inverse(A, B):
         eq.append((lhs, B[i][0], lhs == B[i][0]))
     return {"A": A, "B": B, "inv": inv, "log": log, "left": left, "right": right,
             "ok": left == I and right == I, "x": x, "eq": eq,
-            "okL": left == I, "okR": right == I, "ixx": matmul(left, x) == x}
+            "okL": left == I, "okR": right == I, "ixx": matmul(left, x) == x,
+            "steps": steps, "pivots": pivots, "swaps": swaps}
 
 
 # ---------- HTML rendering ----------
@@ -109,8 +121,15 @@ table.m{border-collapse:collapse;border-left:2px solid var(--fg);border-right:2p
 table.m td{padding:3px 10px;text-align:right;font-family:ui-monospace,monospace}
 .ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
 details{color:var(--mut)}code{font-family:ui-monospace,monospace}
-ul.chk{list-style:none;padding:0}table.v{border-collapse:collapse}table.v th,table.v td{padding:3px 12px;text-align:right;border-bottom:1px solid #8886}.big{font-size:1.1rem}
+td.dv{border-left:2px solid var(--acc)}tr.hl td{background:#8883}ul.chk{list-style:none;padding:0}table.v{border-collapse:collapse}table.v th,table.v td{padding:3px 12px;text-align:right;border-bottom:1px solid #8886}.big{font-size:1.1rem}
 """
+
+
+def aug(M, n, hi):
+    rows = "".join("<tr" + (" class='hl'" if i == hi else "") + ">" +
+                   "".join(f"<td{' class=dv' if j == n else ''}>{escape(fmt(v))}</td>" for j, v in enumerate(r)) +
+                   "</tr>" for i, r in enumerate(M))
+    return f'<table class="m">{rows}</table>'
 
 
 def mat(M):
@@ -148,8 +167,9 @@ def build_html(res):
         return "".join(h)
     h.append("<section><h2>2) Identify the inverse A<sup>-1</sup></h2><div class='row'>"
              f"<span>A<sup>-1</sup> =</span>{mat(res['inv'])}</div>"
-             "<details><summary>Gauss–Jordan row operations on [A | I]</summary><ol>" +
-             "".join(f"<li>{escape(s)}</li>" for s in res["log"]) + "</ol></details></section>")
+             "<details open><summary>Full working: every row operation on [A | I]</summary>" +
+             "".join(f"<p><b>{str(i) + '.' if i else 'Start.'}</b> {escape(s['t'])}</p>{aug(s['M'], n, s['hi'])}"
+                     for i, s in enumerate(res["steps"])) + "</details></section>")
     verdict = ("<span class='ok'>✔ A<sup>-1</sup>A = AA<sup>-1</sup> = I<sub>n</sub> verified</span>" if res["ok"]
                else "<span class='bad'>✘ check failed</span>")
     h.append("<section><h2>3) Check &nbsp;A<sup>-1</sup>A = A A<sup>-1</sup> = I<sub>n</sub></h2>"

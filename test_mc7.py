@@ -55,6 +55,18 @@ class Validation(unittest.TestCase):
         self.assertEqual(post([["1"]] * 25, ["1"] * 25).status_code, 422)
 
 
+class Working(unittest.TestCase):
+    def test_exact_steps_start_with_A_I_and_end_with_I_inverse(self):
+        r = post([["2", "1"], ["5", "3"]], ["3", "8"]).json()
+        self.assertEqual(r["steps"][0]["M"], [["2", "1", "1", "0"], ["5", "3", "0", "1"]])
+        self.assertEqual(r["steps"][-1]["M"], [["1", "0", "3", "-1"], ["0", "1", "-5", "2"]])
+        self.assertEqual(r["swaps"], 0)
+
+    def test_decimal_steps_one_per_column(self):
+        s = client.get("/api/random?n=12").json()
+        self.assertEqual(len(post(s["a"], s["b"]).json()["steps"]), 13)
+
+
 class Cli(unittest.TestCase):
     def test_short_row_gives_message_not_traceback(self):  # BUG-4
         p = subprocess.run([sys.executable, "mc7_matrix_inverse.py", "--input"], input="2\n1 2\n",

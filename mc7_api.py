@@ -49,15 +49,21 @@ def num(s, where):
     return F(top) / F(bottom) if bottom else F(top)
 
 
+def steps_json(steps):
+    return [{"t": s["t"], "M": [[str(v) for v in r] for r in s["M"]], "hi": s["hi"]} for s in steps]
+
+
 def exact_payload(A, B):
     n = len(A)
     res = mc.solve_with_inverse(A, [[b] for b in B])
     if res["inv"] is None:
-        return {"mode": "exact", "n": n, "inv": None, "log": res["log"], "det": "0"}
+        return {"mode": "exact", "n": n, "inv": None, "log": res["log"], "det": "0",
+                "steps": steps_json(res["steps"])}
     s = lambda M: [[str(v) for v in r] for r in M]
     rows = [{"l": str(l), "b": str(b), "ok": ok} for l, b, ok in res["eq"]]
     return {"mode": "exact", "n": n, "inv": s(res["inv"]), "left": s(res["left"]), "right": s(res["right"]),
             "x": s(res["x"]), "log": res["log"], "det": str(mc.determinant(A)), "ok": res["ok"],
+            "steps": steps_json(res["steps"]), "pivots": [str(q) for q in res["pivots"]], "swaps": res["swaps"],
             "ver": {"rows": rows, "okL": res["okL"], "okR": res["okR"], "okI": res["ixx"]}}
 
 
@@ -66,14 +72,16 @@ def fmm(P, Q):
 
 
 def float_inverse(A):
-    """Gauss-Jordan with partial pivoting in double precision."""
+    """Gauss-Jordan with partial pivoting in double precision. Returns (inverse, why, steps)."""
     n = len(A)
     M = [r[:] + [float(i == j) for j in range(n)] for i, r in enumerate(A)]
+    snap = lambda t, hi: {"t": t, "M": [r[:] for r in M], "hi": hi}
+    steps = [snap("Write [A | I]", None)]
     scale = max(abs(v) for r in A for v in r) or 1.0
     for c in range(n):
         p = max(range(c, n), key=lambda r: abs(M[r][c]))
         if abs(M[p][c]) <= 1e-12 * scale:
-            return None, f"No usable pivot in column {c + 1}"
+            return None, f"No usable pivot in column {c + 1}", steps
         M[c], M[p] = M[p], M[c]
         pv = M[c][c]
         M[c] = [v / pv for v in M[c]]
@@ -81,15 +89,17 @@ def float_inverse(A):
             if r != c and M[r][c]:
                 f = M[r][c]
                 M[r] = [a - f * b for a, b in zip(M[r], M[c])]
-    return [r[n:] for r in M], None
+        swap = f"swap R{c + 1} ↔ R{p + 1} (largest entry), " if p != c else ""
+        steps.append(snap(f"Column {c + 1}: {swap}divide R{c + 1} by {pv:.4g}, then clear the rest of the column", c))
+    return [r[n:] for r in M], None, steps
 
 
 def float_payload(A, B):
     n = len(A)
     Af, Bf = [[float(v) for v in r] for r in A], [float(b) for b in B]
-    inv, why = float_inverse(Af)
+    inv, why, steps = float_inverse(Af)
     if inv is None:
-        return {"mode": "float", "n": n, "inv": None, "why": why}
+        return {"mode": "float", "n": n, "inv": None, "why": why, "steps": steps}
     left, right, x = fmm(inv, Af), fmm(Af, inv), fmm(inv, [[b] for b in Bf])
     dev = lambda M: max(abs(v - (i == j)) for i, r in enumerate(M) for j, v in enumerate(r))
     e1, e2 = dev(left), dev(right)
@@ -102,7 +112,7 @@ def float_payload(A, B):
     okI = all(abs(ix[i][0] - x[i][0]) <= 1e-6 * max(1, abs(x[i][0])) for i in range(n))
     n1 = lambda M: max(sum(abs(M[i][j]) for i in range(n)) for j in range(n))
     return {"mode": "float", "n": n, "inv": inv, "left": left, "right": right, "x": x, "e1": e1, "e2": e2,
-            "res": res, "cond": n1(Af) * n1(inv), "ok": max(e1, e2) < 1e-6,
+            "res": res, "cond": n1(Af) * n1(inv), "ok": max(e1, e2) < 1e-6, "steps": steps,
             "ver": {"rows": rows, "okL": e1 < 1e-6, "okR": e2 < 1e-6, "okI": okI}}
 
 
