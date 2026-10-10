@@ -22,20 +22,36 @@ from pathlib import Path
 MAX_N = 24
 
 
+# fmt(x): turns a number into text for tables. Short values print as they are (3/2, -4).
+# Very long fractions are shortened to a decimal like 1.2346e+10 so tables stay readable.
+# Display only: the math always uses the exact value.
 def fmt(x):
     s = str(x)  # Fraction prints "3/2" or "3"
-    return s if len(s) <= 10 else f"{float(x):.5g}"  # shorten huge fractions for display
+    if len(s) <= 10:
+        return s
+    try:
+        return f"{float(x):.5g}"  # shorten long fractions for display
+    except OverflowError:  # too big even for a decimal: show only the start
+        return s[:8] + "…"
 
 
+# matmul(P, Q): multiplies two matrices. Entry (i, j) of the answer is row i of P times column j of Q
+# (multiply the matching entries, then add them up). Used for A^-1 A, A A^-1 and x = A^-1 B.
 def matmul(P, Q):
     return [[sum(P[i][k] * Q[k][j] for k in range(len(Q))) for j in range(len(Q[0]))]
             for i in range(len(P))]
 
 
+# identity(n): the n x n identity matrix: 1s on the diagonal, 0s everywhere else.
+# It plays the role of the number 1 for matrices (I x = x).
 def identity(n):
     return [[F(int(i == j)) for j in range(n)] for i in range(n)]
 
 
+# gauss_jordan_steps(A): the heart of the project (Gauss-Jordan elimination).
+# Write [A | I] and apply row operations until the left half becomes I; the right half is then A^-1.
+# Every operation is saved as a snapshot so the page can show the working.
+# If a column has no pivot (no nonzero entry to use), A is singular and has no inverse.
 def gauss_jordan_steps(A):
     """Row-reduce [A | I]. Returns (inverse or None, steps, pivots, swaps).
     steps[0] is the starting matrix; each later step is one row operation plus the matrix after it."""
@@ -44,40 +60,50 @@ def gauss_jordan_steps(A):
     snap = lambda t, hi: {"t": t, "M": [r[:] for r in M], "hi": hi}
     steps, pivots, swaps = [snap("Write [A | I]", None)], [], 0
     for c in range(n):
+        # find a pivot: the first row at or below the diagonal with a nonzero entry in this column
         p = next((r for r in range(c, n) if M[r][c] != 0), None)
         if p is None:
             steps.append(snap(f"No pivot in column {c + 1}: A is singular.", None))
             return None, steps, pivots, swaps
         if p != c:
+            # swap rows so the pivot sits on the diagonal (this flips the sign of the determinant)
             M[c], M[p] = M[p], M[c]
             swaps += 1
             steps.append(snap(f"R{c + 1} ↔ R{p + 1}", c))
         pv = M[c][c]
         pivots.append(pv)
         if pv != 1:
+            # divide the pivot row by the pivot so the pivot becomes 1
             M[c] = [v / pv for v in M[c]]
             steps.append(snap(f"R{c + 1} → R{c + 1} ÷ {pv}", c))
         for r in range(n):
             if r != c and M[r][c] != 0:
                 f = M[r][c]
+                # subtract f x (pivot row) so the entry in the pivot column becomes 0
                 M[r] = [a - f * b for a, b in zip(M[r], M[c])]
                 steps.append(snap(f"R{r + 1} → R{r + 1} − ({f})·R{c + 1}", r))
     return [row[n:] for row in M], steps, pivots, swaps
 
 
+# gauss_jordan_inverse(A): the short version of the function above.
+# Returns just (inverse or None, list of row operations in words).
 def gauss_jordan_inverse(A):
     """Returns (inverse or None, list of row-operation texts)."""
     inv, steps, _, _ = gauss_jordan_steps(A)
     return inv, [s["t"] for s in steps[1:]]
 
 
+# determinant(A): det(A) by elimination = the product of the pivots,
+# with the sign flipped once for every row swap. det(A) = 0 means there is no inverse.
 def determinant(A):
     M, n, d = [row[:] for row in A], len(A), F(1)
     for c in range(n):
+        # find a pivot: the first row at or below the diagonal with a nonzero entry in this column
         p = next((r for r in range(c, n) if M[r][c] != 0), None)
         if p is None:
             return F(0)
         if p != c:
+            # swap rows so the pivot sits on the diagonal (this flips the sign of the determinant)
             M[c], M[p] = M[p], M[c]
             d = -d
         d *= M[c][c]
@@ -87,6 +113,10 @@ def determinant(A):
     return d
 
 
+# solve_with_inverse(A, B): runs the whole assignment for one system.
+#   1) finds A^-1   2) checks A^-1 A and A A^-1 both equal I   3) solves x = A^-1 B
+#   4) verifies x by putting it back into every original equation.
+# B must be a column, like [[8], [-11], [-3]].
 def solve_with_inverse(A, B):
     inv, steps, pivots, swaps = gauss_jordan_steps(A)
     log = [s["t"] for s in steps[1:]]
@@ -121,10 +151,23 @@ table.m{border-collapse:collapse;border-left:2px solid var(--fg);border-right:2p
 table.m td{padding:3px 10px;text-align:right;font-family:ui-monospace,monospace}
 .ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
 details{color:var(--mut)}code{font-family:ui-monospace,monospace}
-td.dv{border-left:2px solid var(--acc)}tr.hl td{background:#8883}ul.chk{list-style:none;padding:0}table.v{border-collapse:collapse}table.v th,table.v td{padding:3px 12px;text-align:right;border-bottom:1px solid #8886}.big{font-size:1.1rem}
+td.dv{border-left:2px solid var(--acc)}ul.wl{list-style:none;padding:0;font:.85rem/1.7 ui-monospace,monospace;max-height:300px;overflow:auto;white-space:nowrap}tr.hl td{background:#8883}ul.chk{list-style:none;padding:0}table.v{border-collapse:collapse}table.v th,table.v td{padding:3px 12px;text-align:right;border-bottom:1px solid #8886}.big{font-size:1.1rem}
 """
 
 
+# dots(P, Q): HTML list of the entry-by-entry arithmetic of P x Q, for example
+# (1,1) = (4)(2) + (3)(-3) + (-1)(-2) = 1. Used by the static report.
+def dots(P, Q):
+    """Entry-by-entry work for the product P x Q: row i of P times column j of Q."""
+    m = len(Q)
+    return "".join(
+        f"<li>({i + 1},{j + 1}) = " + " + ".join(f"({fmt(P[i][k])})({fmt(Q[k][j])})" for k in range(m)) +
+        f" = <b>{fmt(sum(P[i][k] * Q[k][j] for k in range(m)))}</b></li>"
+        for i in range(len(P)) for j in range(len(Q[0])))
+
+
+# aug(M, n, hi): draws one snapshot of [A | I] as an HTML table,
+# with a divider after column n and row hi highlighted (the row that just changed).
 def aug(M, n, hi):
     rows = "".join("<tr" + (" class='hl'" if i == hi else "") + ">" +
                    "".join(f"<td{' class=dv' if j == n else ''}>{escape(fmt(v))}</td>" for j, v in enumerate(r)) +
@@ -132,19 +175,19 @@ def aug(M, n, hi):
     return f'<table class="m">{rows}</table>'
 
 
+# mat(M): draws a matrix as an HTML table with bracket-style side borders.
 def mat(M):
     rows = "".join("<tr>" + "".join(f"<td>{escape(fmt(v))}</td>" for v in r) + "</tr>" for r in M)
     return f'<table class="m">{rows}</table>'
 
 
-def op(s):
-    return f"<span>{s}</span>"
-
-
+# build_html(res): builds the whole static report page (Steps 1 to 5)
+# from the dictionary returned by solve_with_inverse. A singular matrix gets a short message instead.
 def build_html(res):
     A, B, n = res["A"], res["B"], len(res["A"])
-    names = [f"x<sub>{i + 1}</sub>" for i in range(n)]
+    names = list("xyzw"[:n]) if n <= 4 else [f"x<sub>{i + 1}</sub>" for i in range(n)]  # x, y, z, w like on the board
     eqs = []
+    # term(v, name): one piece of an equation, e.g. "+ 3x1", "- x2" (a coefficient of 1 is left out).
     def term(v, name):
         return ("− " if v < 0 else "+ ") + ("" if abs(v) == 1 else fmt(abs(v))) + name
     for r in range(n):
@@ -173,10 +216,14 @@ def build_html(res):
     verdict = ("<span class='ok'>✔ A<sup>-1</sup>A = AA<sup>-1</sup> = I<sub>n</sub> verified</span>" if res["ok"]
                else "<span class='bad'>✘ check failed</span>")
     h.append("<section><h2>3) Check &nbsp;A<sup>-1</sup>A = A A<sup>-1</sup> = I<sub>n</sub></h2>"
-             f"<div class='row'><span>A<sup>-1</sup>A =</span>{mat(res['left'])}"
-             f"<span>AA<sup>-1</sup> =</span>{mat(res['right'])}</div><p>{verdict}</p></section>")
+             f"<div class='row'><span>A<sup>-1</sup></span>{mat(res['inv'])}<span>× A</span>{mat(A)}<span>=</span>{mat(res['left'])}</div>"
+             f"<div class='row'><span>A</span>{mat(A)}<span>× A<sup>-1</sup></span>{mat(res['inv'])}<span>=</span>{mat(res['right'])}</div>"
+             f"<p>{verdict}</p>"
+             f"<details><summary>Show the multiplication work, entry by entry</summary>"
+             f"<p>A<sup>-1</sup>A</p><ul class='wl'>{dots(res['inv'], A)}</ul>"
+             f"<p>AA<sup>-1</sup></p><ul class='wl'>{dots(A, res['inv'])}</ul></details></section>")
     sol = "".join(f"<br>{names[i]} = <b>{escape(fmt(res['x'][i][0]))}</b>" for i in range(n))
-    h.append("<section><h2>4) [x] = A<sup>-1</sup>B</h2><div class='row'>"
+    h.append("<section><h2>4) [X] = A<sup>-1</sup>B</h2><div class='row'>"
              f"{mat(res['inv'])}{mat(B)}<span>=</span>{mat(res['x'])}</div><p>Solution:{sol}</p></section>")
     items = [(True, "A is invertible: det(A) ≠ 0"),
              (all(q[2] for q in res["eq"]), "Substituting x into the equations gives Ax = B"),
@@ -198,6 +245,11 @@ def build_html(res):
     return "".join(h)
 
 
+# random_system(n): makes a random system that always has an inverse, plus a hidden
+# whole-number answer x, and sets B = A x so the true answer is known in advance.
+#   n <= 10: A = L x U (triangles with 1s on the diagonal), so det = 1 and A^-1 and x stay whole numbers.
+#   n  > 10: every diagonal entry is bigger than the rest of its row (diagonally dominant),
+#            which guarantees an inverse and keeps decimal arithmetic stable.
 def random_system(n):
     """Random invertible system; B = A·x for a hidden integer x.
     n <= 10: A = L·U with unit triangles (det 1, whole-number inverse). Larger: diagonally dominant."""
@@ -218,6 +270,8 @@ def random_system(n):
     return A, [[sum(A[i][j] * x[j] for j in range(n))] for i in range(n)]
 
 
+# read_system(): the --input mode. Asks for n, then one line per equation
+# (the coefficients, then the constant) and checks every line before accepting it.
 def read_system():
     try:
         n = int(input(f"Number of equations/unknowns n (1-{MAX_N}): "))
@@ -239,6 +293,8 @@ def read_system():
     return A, B
 
 
+# Command line:  (no flag) sample system | --input type your own | --random [n] random system.
+# It prints the inverse, the check result and x, then writes mc7_report.html next to this file.
 if __name__ == "__main__":
     if "--input" in sys.argv:
         A, B = read_system()

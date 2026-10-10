@@ -19,6 +19,7 @@ from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -28,9 +29,12 @@ EXACT_MAX = 10  # exact fractions up to this size, double precision above it
 HERE = Path(__file__).parent
 
 app = FastAPI(title="MC#7 Matrix Inverse API")
+app.add_middleware(GZipMiddleware, minimum_size=1024)  # the step snapshots compress very well
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
+# System: the shape of the request body. A = rows of coefficients, B = the constants.
+# Everything is TEXT so that 3/4 and 1.5 arrive exactly as the person typed them.
 class System(BaseModel):
     A: List[List[str]]
     B: List[str]
@@ -39,6 +43,10 @@ class System(BaseModel):
 NUM = re.compile(r"^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:/(?:\d+(?:\.\d+)?|\.\d+))?$")  # same grammar as the page
 
 
+# num(s, where): turns one typed entry into an exact fraction.
+# Accepts 3, -2, 1.5, .5, 3/4 and 1.5/3 (the same rules as the page).
+# Rejects anything else (letters, exponents like 1e9, over 40 characters, divide by zero)
+# with a message that names the cell, e.g. "Row 2, column 3 is not a number".
 def num(s, where):
     t = s.strip().replace("−", "-")
     if len(t) > 40 or not NUM.match(t):  # also blocks exponents like 1e9999999, which would exhaust memory
@@ -49,10 +57,14 @@ def num(s, where):
     return F(top) / F(bottom) if bottom else F(top)
 
 
+# steps_json(steps): turns the saved row-operation snapshots into JSON-friendly text (fractions become "3/4").
 def steps_json(steps):
     return [{"t": s["t"], "M": [[str(v) for v in r] for r in s["M"]], "hi": s["hi"]} for s in steps]
 
 
+# exact_payload(A, B): the answer for sizes up to EXACT_MAX, using exact fractions via the solver.
+# Sends the inverse, both check products, x, the determinant, pivots, row-operation snapshots
+# and the verification, all as text. Very long numbers skip the snapshots to keep the reply small.
 def exact_payload(A, B):
     n = len(A)
     res = mc.solve_with_inverse(A, [[b] for b in B])
@@ -61,39 +73,55 @@ def exact_payload(A, B):
                 "steps": steps_json(res["steps"])}
     s = lambda M: [[str(v) for v in r] for r in M]
     rows = [{"l": str(l), "b": str(b), "ok": ok} for l, b, ok in res["eq"]]
+    steps = steps_json(res["steps"])
+    omitted = sum(len(v) for st in steps for row in st["M"] for v in row) > 300_000
+    if omitted:  # very long numbers would make a multi-megabyte reply on every keystroke
+        steps = []
     return {"mode": "exact", "n": n, "inv": s(res["inv"]), "left": s(res["left"]), "right": s(res["right"]),
             "x": s(res["x"]), "log": res["log"], "det": str(mc.determinant(A)), "ok": res["ok"],
-            "steps": steps_json(res["steps"]), "pivots": [str(q) for q in res["pivots"]], "swaps": res["swaps"],
+            "steps": steps, "steps_omitted": omitted, "pivots": [str(q) for q in res["pivots"]], "swaps": res["swaps"],
             "ver": {"rows": rows, "okL": res["okL"], "okR": res["okR"], "okI": res["ixx"]}}
 
 
+# fmm(P, Q): matrix multiplication with ordinary decimals (the decimal twin of matmul).
 def fmm(P, Q):
     return [[sum(P[i][k] * Q[k][j] for k in range(len(Q))) for j in range(len(Q[0]))] for i in range(len(P))]
 
 
+# float_inverse(A): Gauss-Jordan in decimals, for sizes above EXACT_MAX.
+# Uses PARTIAL PIVOTING: at each column it picks the row with the largest |entry|, which keeps rounding errors small.
+# Singular test: the pivot is smaller than 1e-12 x the size of its original column.
+# Returns (inverse or None, reason, snapshots).
 def float_inverse(A):
     """Gauss-Jordan with partial pivoting in double precision. Returns (inverse, why, steps)."""
     n = len(A)
     M = [r[:] + [float(i == j) for j in range(n)] for i, r in enumerate(A)]
-    snap = lambda t, hi: {"t": t, "M": [r[:] for r in M], "hi": hi}
+    snap = lambda t, hi: {"t": t, "M": [[round(v, 8) for v in r] for r in M], "hi": hi}
     steps = [snap("Write [A | I]", None)]
-    scale = max(abs(v) for r in A for v in r) or 1.0
+    scale = [max(abs(r[c]) for r in A) for c in range(n)]  # size of each ORIGINAL column
     for c in range(n):
+        # partial pivoting: pick the row with the largest |entry| in this column
         p = max(range(c, n), key=lambda r: abs(M[r][c]))
-        if abs(M[p][c]) <= 1e-12 * scale:
+        if abs(M[p][c]) <= 1e-12 * scale[c]:
             return None, f"No usable pivot in column {c + 1}", steps
+        # swap it onto the diagonal, then divide by the pivot so the pivot becomes 1
         M[c], M[p] = M[p], M[c]
         pv = M[c][c]
         M[c] = [v / pv for v in M[c]]
         for r in range(n):
             if r != c and M[r][c]:
                 f = M[r][c]
+                # subtract f x (pivot row) so this row's entry in the pivot column becomes 0
                 M[r] = [a - f * b for a, b in zip(M[r], M[c])]
         swap = f"swap R{c + 1} ↔ R{p + 1} (largest entry), " if p != c else ""
         steps.append(snap(f"Column {c + 1}: {swap}divide R{c + 1} by {pv:.4g}, then clear the rest of the column", c))
     return [r[n:] for r in M], None, steps
 
 
+# float_payload(A, B): the answer for sizes above EXACT_MAX, in decimals.
+# Besides the inverse and x it measures how trustworthy the result is:
+#   e1, e2 = how far A^-1 A and A A^-1 are from I      res = largest error of A x - B
+#   cond   = condition number (how sensitive the answer is; above 1e8 means unreliable).
 def float_payload(A, B):
     n = len(A)
     Af, Bf = [[float(v) for v in r] for r in A], [float(b) for b in B]
@@ -116,16 +144,20 @@ def float_payload(A, B):
             "ver": {"rows": rows, "okL": e1 < 1e-6, "okR": e2 < 1e-6, "okI": okI}}
 
 
+# GET /  ->  serves the web page.
 @app.get("/")
 def index():
     return FileResponse(HERE / "mc7_interactive.html")
 
 
+# GET /api/health  ->  lets the page (and you) check that the server is alive and see the limits.
 @app.get("/api/health")
 def health():
     return {"ok": True, "max_n": mc.MAX_N, "exact_max": EXACT_MAX}
 
 
+# POST /api/solve  ->  the main endpoint. Checks the size and shape, converts every entry with num(),
+# then answers with exact fractions (n <= EXACT_MAX) or decimals (bigger).
 @app.post("/api/solve")
 def solve(s: System):
     n = len(s.A)
@@ -145,8 +177,9 @@ def solve(s: System):
         raise HTTPException(422, "These numbers are too large or too small to solve in decimal mode.")
 
 
+# GET /api/random?n=8  ->  a random invertible system (random size 2..MAX_N when n is left out).
 @app.get("/api/random")
-def random_system(n: Optional[int] = Query(None, ge=1, le=24)):
+def random_system(n: Optional[int] = Query(None, ge=1, le=mc.MAX_N)):
     A, B = mc.random_system(n or random.randint(2, mc.MAX_N))
     return {"a": [[str(v) for v in r] for r in A], "b": [str(r[0]) for r in B]}
 
