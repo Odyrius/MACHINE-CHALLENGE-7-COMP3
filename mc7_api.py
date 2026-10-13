@@ -11,6 +11,7 @@ Endpoints
 The page falls back to its built-in JavaScript solver if this server is not running.
 """
 import json
+import operator
 import random
 import re
 from fractions import Fraction as F
@@ -21,23 +22,26 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import mc7_matrix_inverse as mc
 
+SNAP_MAX = 40   # decimal systems up to this size also send a matrix snapshot for every pivot column
 EXACT_MAX = 10  # exact fractions up to this size, double precision above it
 HERE = Path(__file__).parent
 
 app = FastAPI(title="MC#7 Matrix Inverse API")
 app.add_middleware(GZipMiddleware, minimum_size=1024)  # the step snapshots compress very well
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
+app.mount("/static", StaticFiles(directory=str(HERE)), name="static")
 
 # System: the shape of the request body. A = rows of coefficients, B = the constants.
 # Everything is TEXT so that 3/4 and 1.5 arrive exactly as the person typed them.
 class System(BaseModel):
     A: List[List[str]]
     B: List[str]
+    unlimited: bool = False  # True only after the person ticked "Remove the size limit" and accepted the warning
 
 
 NUM = re.compile(r"^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:/(?:\d+(?:\.\d+)?|\.\d+))?$")  # same grammar as the page
@@ -85,7 +89,8 @@ def exact_payload(A, B):
 
 # fmm(P, Q): matrix multiplication with ordinary decimals (the decimal twin of matmul).
 def fmm(P, Q):
-    return [[sum(P[i][k] * Q[k][j] for k in range(len(Q))) for j in range(len(Q[0]))] for i in range(len(P))]
+    cols = list(zip(*Q))  # work with columns of Q so each entry is one fast dot product
+    return [[sum(map(operator.mul, row, c)) for c in cols] for row in P]
 
 
 # float_inverse(A): Gauss-Jordan in decimals, for sizes above EXACT_MAX.
@@ -96,7 +101,8 @@ def float_inverse(A):
     """Gauss-Jordan with partial pivoting in double precision. Returns (inverse, why, steps)."""
     n = len(A)
     M = [r[:] + [float(i == j) for j in range(n)] for i, r in enumerate(A)]
-    snap = lambda t, hi: {"t": t, "M": [[round(v, 8) for v in r] for r in M], "hi": hi}
+    keep = n <= SNAP_MAX  # above this a snapshot of every column would hold millions of numbers: keep only the text
+    snap = lambda t, hi: {"t": t, "M": [[round(v, 8) for v in r] for r in M] if keep else None, "hi": hi}
     steps = [snap("Write [A | I]", None)]
     scale = [max(abs(r[c]) for r in A) for c in range(n)]  # size of each ORIGINAL column
     for c in range(n):
@@ -139,7 +145,9 @@ def float_payload(A, B):
     ix = fmm(left, x)
     okI = all(abs(ix[i][0] - x[i][0]) <= 1e-6 * max(1, abs(x[i][0])) for i in range(n))
     n1 = lambda M: max(sum(abs(M[i][j]) for i in range(n)) for j in range(n))
-    return {"mode": "float", "n": n, "inv": inv, "left": left, "right": right, "x": x, "e1": e1, "e2": e2,
+    rnd = lambda M: [[round(v, 8) for v in r] for r in M]  # the page shows 4 decimals, so 8 is plenty
+    return {"mode": "float", "n": n, "inv": rnd(inv), "x": rnd(x), "e1": e1, "e2": e2,
+            "left": rnd(left) if n <= 15 else None, "right": rnd(right) if n <= 15 else None,  # the page only draws them up to 15x15
             "res": res, "cond": n1(Af) * n1(inv), "ok": max(e1, e2) < 1e-6, "steps": steps,
             "ver": {"rows": rows, "okL": e1 < 1e-6, "okR": e2 < 1e-6, "okI": okI}}
 
@@ -153,16 +161,20 @@ def index():
 # GET /api/health  ->  lets the page (and you) check that the server is alive and see the limits.
 @app.get("/api/health")
 def health():
-    return {"ok": True, "max_n": mc.MAX_N, "exact_max": EXACT_MAX}
+    return {"ok": True, "max_n": mc.MAX_N, "abs_max": mc.ABS_MAX, "exact_max": EXACT_MAX}
 
 
 # POST /api/solve  ->  the main endpoint. Checks the size and shape, converts every entry with num(),
 # then answers with exact fractions (n <= EXACT_MAX) or decimals (bigger).
+# Sizes above MAX_N (24) are only accepted when the request says "unlimited": true; the hard ceiling is ABS_MAX (200).
 @app.post("/api/solve")
 def solve(s: System):
     n = len(s.A)
-    if not 1 <= n <= mc.MAX_N:
-        raise HTTPException(422, f"The size must be between 1 and {mc.MAX_N}.")
+    limit = mc.ABS_MAX if s.unlimited else mc.MAX_N
+    if not 1 <= n <= limit:
+        if n > mc.MAX_N and not s.unlimited:
+            raise HTTPException(422, f"Systems above {mc.MAX_N}x{mc.MAX_N} need the 'Remove the size limit' option.")
+        raise HTTPException(422, f"The size must be between 1 and {limit}.")
     if any(len(r) != n for r in s.A) or len(s.B) != n:
         raise HTTPException(422, "The system must be square: n equations and n unknowns.")
     A = [[num(v, f"Row {i + 1}, column {j + 1}") for j, v in enumerate(r)] for i, r in enumerate(s.A)]
@@ -177,10 +189,13 @@ def solve(s: System):
         raise HTTPException(422, "These numbers are too large or too small to solve in decimal mode.")
 
 
-# GET /api/random?n=8  ->  a random invertible system (random size 2..MAX_N when n is left out).
+# GET /api/random?n=8&unlimited=true  ->  a random invertible system (random size 2..24, or 2..60 when unlimited, if n is left out).
 @app.get("/api/random")
-def random_system(n: Optional[int] = Query(None, ge=1, le=mc.MAX_N)):
-    A, B = mc.random_system(n or random.randint(2, mc.MAX_N))
+def random_system(n: Optional[int] = Query(None, ge=1), unlimited: bool = False):
+    limit = mc.ABS_MAX if unlimited else mc.MAX_N
+    if n is not None and n > limit:
+        raise HTTPException(422, f"The size must be between 1 and {limit}.")
+    A, B = mc.random_system(n or random.randint(2, min(limit, 60)), limit)  # random sizes stay up to 60 so they solve quickly
     return {"a": [[str(v) for v in r] for r in A], "b": [str(r[0]) for r in B]}
 
 

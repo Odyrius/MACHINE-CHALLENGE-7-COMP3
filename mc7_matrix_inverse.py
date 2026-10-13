@@ -19,7 +19,8 @@ from fractions import Fraction as F
 from html import escape
 from pathlib import Path
 
-MAX_N = 24
+MAX_N = 24    # normal size limit
+ABS_MAX = 200  # hard ceiling when the person ticks "Remove the size limit" (above this a solve takes minutes)
 
 
 # fmt(x): turns a number into text for tables. Short values print as they are (3/2, -4).
@@ -250,10 +251,10 @@ def build_html(res):
 #   n <= 10: A = L x U (triangles with 1s on the diagonal), so det = 1 and A^-1 and x stay whole numbers.
 #   n  > 10: every diagonal entry is bigger than the rest of its row (diagonally dominant),
 #            which guarantees an inverse and keeps decimal arithmetic stable.
-def random_system(n):
+def random_system(n, limit=MAX_N):
     """Random invertible system; B = A·x for a hidden integer x.
     n <= 10: A = L·U with unit triangles (det 1, whole-number inverse). Larger: diagonally dominant."""
-    n = max(1, min(n, MAX_N))
+    n = max(1, min(n, limit))
     R = random.randint
     x = [R(-9, 9) for _ in range(n)]
     if n <= 10:
