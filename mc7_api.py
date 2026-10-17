@@ -194,7 +194,6 @@ def float_payload(A, B):
         "ver": {"rows": rows, "okL": e1 < 1e-6, "okR": e2 < 1e-6, "okI": okI},
     }
 
-
 @app.get("/")
 def index():
     """
@@ -203,24 +202,17 @@ def index():
     """
     return FileResponse(HERE / "mc7_interactive.html")
 
-
+@app.get("/style.css")
 @app.get("/static/style.css")
 def serve_css():
-    """
-    What it does: Serves the external stylesheet without exposing the project directory.
-    Output: FileResponse streaming style.css.
-    """
+    """Serves style.css for both relative and /static/ paths."""
     return FileResponse(HERE / "style.css", media_type="text/css")
 
-
+@app.get("/script.js")
 @app.get("/static/script.js")
 def serve_js():
-    """
-    What it does: Serves the frontend JavaScript file.
-    Output: FileResponse streaming script.js.
-    """
+    """Serves script.js for both relative and /static/ paths."""
     return FileResponse(HERE / "script.js", media_type="application/javascript")
-
 
 @app.get("/api/health")
 def health():

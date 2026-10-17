@@ -3,7 +3,7 @@ const MAX_N = 24, ABS_MAX = 200, SNAP_MAX = 40, GRID_MAX = 60, EXACT_MAX = 10, E
 let UNLOCK = false;
 
 /**
- * Checks the current maximum allowed matrix dimension n.
+ * Returns the current maximum allowed matrix dimension n.
  * Output: Number (200 if unlocked, 24 otherwise).
  */
 const LIMIT = () => UNLOCK ? ABS_MAX : MAX_N;
@@ -12,13 +12,13 @@ const LIMIT = () => UNLOCK ? ABS_MAX : MAX_N;
 
 /**
  * Computes the absolute value of a BigInt.
- * Output: Positive BigInt.
+ * Output: Non-negative BigInt.
  */
 const babs = a => a < 0n ? -a : a;
 
 /**
- * Computes the greatest common divisor of two BigInts using Euclid's algorithm.
- * Output: Positive BigInt representing the GCD.
+ * Computes the greatest common divisor of two BigInts via Euclid's algorithm.
+ * Output: Non-negative BigInt representing gcd(|a|, |b|).
  */
 const gcd = (a, b) => {
   a = babs(a);
@@ -28,8 +28,8 @@ const gcd = (a, b) => {
 };
 
 /**
- * Creates a simplified fraction object {n: numerator, d: denominator} using BigInts.
- * Output: Object {n: BigInt, d: BigInt} in lowest terms with d > 0.
+ * Constructs a simplified fraction {n: numerator, d: denominator} with d > 0.
+ * Output: Object {n: BigInt, d: BigInt}.
  */
 const fr = (n, d = 1n) => {
   n = BigInt(n);
@@ -40,8 +40,8 @@ const fr = (n, d = 1n) => {
 };
 
 /**
- * Arithmetic operations (add, subtract, multiply, divide) on two fraction objects.
- * Output: A new simplified fraction object {n: BigInt, d: BigInt}.
+ * Exact rational arithmetic operations (+, -, *, /).
+ * Output: Simplified fraction Object {n: BigInt, d: BigInt}.
  */
 const add = (a, b) => fr(a.n * b.d + b.n * a.d, a.d * b.d);
 const sub = (a, b) => fr(a.n * b.d - b.n * a.d, a.d * b.d);
@@ -49,34 +49,34 @@ const mul = (a, b) => fr(a.n * b.n, a.d * b.d);
 const div = (a, b) => fr(a.n * b.d, a.d * b.n);
 
 /**
- * Checks if a fraction object equals 0 or 1.
- * Output: Boolean (true or false).
+ * Checks whether a fraction equals 0 or 1.
+ * Output: Boolean.
  */
 const isZ = a => a.n === 0n;
 const isOne = a => a.n === 1n && a.d === 1n;
 const ZERO = fr(0), ONE = fr(1);
 
 /**
- * Formats a fraction object into a display string (e.g., "3/4" or "5").
- * Output: String with typographic minus sign.
+ * Converts a fraction object to a display string (e.g., "3/4" or "−2").
+ * Output: String.
  */
 const str = a => (a.d === 1n ? a.n.toString() : a.n + '/' + a.d).replaceAll('-', '−');
 
 /**
- * Converts a fraction into a 4-decimal-place approximation string if it is not a whole number.
- * Output: String (e.g., "≈ 0.7500" or "" for integers).
+ * Formats a non-integer fraction as a 4-decimal approximation string.
+ * Output: String (e.g., "≈ 0.7500", or "" for integers).
  */
 const dec = a => {
   const q = Number(a.n) / Number(a.d);
   return a.d === 1n || !isFinite(q) ? '' : '≈ ' + q.toFixed(4).replaceAll('-', '−');
 };
 
-// Regex matching valid integers, decimals, and signed fractions (e.g., 3, -2, 1.5, 3/-4)
+// Matches integers, decimals, and fractions with optional signs (e.g., 3, -2, 1.5, 3/-4)
 const NUM = /^([+-]?\d*\.?\d+)(?:\/([+-]?\d*\.?\d+))?$/;
 
 /**
- * Trims whitespace, normalizes minus signs, and enforces the 40-character limit.
- * Output: Cleaned String (or "" if over 40 chars).
+ * Trims whitespace, normalizes minus signs, and rejects strings over 40 characters.
+ * Output: String.
  */
 const clean = s => {
   const t = s.trim().replaceAll('−', '-');
@@ -84,8 +84,8 @@ const clean = s => {
 };
 
 /**
- * Parses a user-typed string into an exact BigInt fraction object.
- * Output: Fraction object {n, d}, or null if invalid or dividing by zero.
+ * Parses a numeric input string into an exact BigInt fraction object.
+ * Output: Object {n: BigInt, d: BigInt}, or null if invalid.
  */
 function parseX(s) {
   const m = clean(s).match(NUM);
@@ -104,8 +104,8 @@ function parseX(s) {
 }
 
 /**
- * Parses a user-typed string into a standard IEEE-754 floating-point number.
- * Output: Number, or null if invalid or dividing by zero.
+ * Parses a numeric input string into a standard double-precision float.
+ * Output: Number, or null if invalid.
  */
 function parseF(s) {
   const m = clean(s).match(NUM);
@@ -119,28 +119,28 @@ function parseF(s) {
 /* ---------- Matrix Helpers ---------- */
 
 /**
- * Builds an n x n identity matrix of exact Fraction objects.
- * Output: 2D Array of fraction objects.
+ * Creates an n x n identity matrix of exact fractions.
+ * Output: 2D Array of fraction Objects.
  */
 const eye = n => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => i === j ? ONE : ZERO));
 
 /**
- * Multiplies two 2D matrices of exact Fraction objects (P * Q).
- * Output: 2D Array of fraction objects representing the product matrix.
+ * Multiplies two exact fraction matrices P and Q, skipping zero multipliers.
+ * Output: 2D Array of fraction Objects.
  */
 const matmul = (P, Q) => P.map(r => Q[0].map((_, j) => r.reduce((s, v, k) => isZ(v) ? s : add(s, mul(v, Q[k][j])), ZERO)));
 
 /**
- * Compares two exact Fraction matrices for entry-by-entry equality.
- * Output: Boolean (true if identical, false otherwise).
+ * Tests whether two exact fraction matrices have identical entries.
+ * Output: Boolean.
  */
 const same = (P, Q) => P.every((r, i) => r.every((v, j) => v.n === Q[i][j].n && v.d === Q[i][j].d));
 
 /* ---------- Built-in Solvers (Offline Fallback) ---------- */
 
 /**
- * Solves Ax = B using exact Gauss-Jordan elimination on [A | I].
- * Output: Object containing mode, n, A, B, inv, log, det, left, right, ok, x, steps, pivots, and swaps.
+ * Solves Ax = B using exact rational Gauss-Jordan elimination on [A | I].
+ * Output: Result Object {mode, n, A, B, inv, log, det, left, right, ok, x, steps, pivots, swaps}.
  */
 function solveExact(A, B) {
   const n = A.length, I = eye(n), log = [];
@@ -167,20 +167,20 @@ function solveExact(A, B) {
       [M[c], M[p]] = [M[p], M[c]];
       det = mul(det, fr(-1));
       swaps++;
-      note(`R${c + 1} <-> R${p + 1}`, c);
+      note(`R${c + 1} ↔ R${p + 1}`, c);
     }
     const pv = M[c][c];
     det = mul(det, pv);
     pivots.push(pv);
     if (!isOne(pv)) {
       M[c] = M[c].map(v => div(v, pv));
-      note(`R${c + 1} -> R${c + 1} / ${str(pv)}`, c);
+      note(`R${c + 1} → R${c + 1} ÷ ${str(pv)}`, c);
     }
     for (let r = 0; r < n; r++) {
       if (r !== c && !isZ(M[r][c])) {
         const f = M[r][c];
         M[r] = M[r].map((v, j) => sub(v, mul(f, M[c][j])));
-        note(`R${r + 1} -> R${r + 1} - (${str(f)})*R${c + 1}`, r);
+        note(`R${r + 1} → R${r + 1} − (${str(f)})·R${c + 1}`, r);
       }
     }
   }
@@ -193,7 +193,7 @@ function solveExact(A, B) {
 }
 
 /**
- * Multiplies two 2D floating-point matrices (P * Q), skipping zeros.
+ * Multiplies two floating-point matrices P and Q, skipping zero entries.
  * Output: 2D Array of Numbers.
  */
 function matmulF(P, Q) {
@@ -212,8 +212,8 @@ function matmulF(P, Q) {
 }
 
 /**
- * Finds the maximum absolute deviation of a matrix M from the identity matrix I.
- * Output: Number (>= 0).
+ * Computes the maximum absolute entry-wise deviation of matrix M from I_n.
+ * Output: Number.
  */
 const dev = M => {
   let e = 0;
@@ -222,7 +222,7 @@ const dev = M => {
 };
 
 /**
- * Computes the 1-norm (maximum column sum of absolute values) of a matrix M.
+ * Computes the 1-norm (maximum absolute column sum) of matrix M.
  * Output: Number.
  */
 const norm1 = M => {
@@ -236,8 +236,8 @@ const norm1 = M => {
 };
 
 /**
- * Solves Ax = B in double-precision floats using Gauss-Jordan elimination with partial pivoting.
- * Output: Object containing mode, n, A, B, inv, left, right, x, e1, e2, res, cond, ok, and steps.
+ * Solves Ax = B in double-precision floats via Gauss-Jordan with partial pivoting.
+ * Output: Result Object {mode, n, A, B, inv, left, right, x, e1, e2, res, cond, ok, steps}.
  */
 function solveFloat(A, B) {
   const n = A.length;
@@ -269,7 +269,7 @@ function solveFloat(A, B) {
       for (let j = 0; j < 2 * n; j++) Mr[j] -= f * Mc[j];
     }
     steps.push({
-      t: `Column ${c + 1}: ${p !== c ? `swap R${c + 1} <-> R${p + 1} (largest entry), ` : ''}divide R${c + 1} by ${fmtF(pv)}, then clear the rest of the column`,
+      t: `Column ${c + 1}: ${p !== c ? `swap R${c + 1} ↔ R${p + 1} (largest entry), ` : ''}divide R${c + 1} by ${fmtF(pv)}, then clear the rest of the column`,
       M: keep ? M.map(r => r.slice()) : null,
       hi: c
     });
@@ -286,14 +286,14 @@ function solveFloat(A, B) {
 const subs = '₀₁₂₃₄₅₆₇₈₉';
 
 /**
- * Generates the variable name for unknown index i (x, y, z, w for n <= 4; subscripted x₁, x₂... for n > 4).
- * Output: String representing the variable name.
+ * Returns the variable name for unknown index i ('x', 'y', 'z', 'w' for n <= 4; 'x₁', 'x₂'... for n > 4).
+ * Output: String.
  */
 const xn = (i, n = N) => n <= 4 ? 'xyzw'[i] : 'x' + String(i + 1).replace(/\d/g, d => subs[d]);
 
 /**
- * Formats a floating-point number to 4 decimal places or scientific notation.
- * Output: Formatted String with typographic minus signs.
+ * Formats a float to 4 decimal places or scientific notation, using typographic minus signs.
+ * Output: String.
  */
 const fmtF = v => {
   const a = Math.abs(v);
@@ -302,25 +302,25 @@ const fmtF = v => {
 };
 
 /**
- * Renders a 2D array M into a bracketed HTML table string using formatter function f.
- * Output: HTML String (<div class="box"><table class="m">...</table></div>).
+ * Renders a 2D array M as a bracketed HTML table string.
+ * Output: HTML String.
  */
 const mat = (M, f) => `<div class="box"><table class="m" role="presentation">${M.map(r => '<tr>' + r.map(v => `<td>${typeof v === 'string' ? v : f(v)}</td>`).join('') + '</tr>').join('')}</table></div>`;
 
 /**
- * Wraps text in a styled span label.
- * Output: HTML String (<span class="lab">...</span>).
+ * Wraps a label string in a <span class="lab"> element.
+ * Output: HTML String.
  */
 const lab = s => `<span class="lab">${s}</span>`;
 
 /**
  * Formats an error metric in 1-decimal scientific notation.
- * Output: String (e.g., "1.2e−16" or "0").
+ * Output: String.
  */
 const sci = v => v === 0 ? '0' : v.toExponential(1).replaceAll('-', '−');
 
 /**
- * Renders an augmented matrix [A | I] snapshot as an HTML table with a vertical divider and row highlight.
+ * Renders an augmented matrix [A | I] snapshot with a partition line after column n and row hi highlighted.
  * Output: HTML String.
  */
 const aug = (M, f, n, hi) => `<div class="box"><table class="m" role="presentation">${M.map((r, i) => `<tr${i === hi ? ' class="hl"' : ''}>${r.map((v, j) => `<td${j === n ? ' class="dv"' : ''}>${f(v)}</td>`).join('')}</tr>`).join('')}</table></div>`;
@@ -328,8 +328,8 @@ const aug = (M, f, n, hi) => `<div class="box"><table class="m" role="presentati
 let LZ = {}, lzId = 0;
 
 /**
- * Creates a collapsible <details> element whose inner HTML is only built when the user clicks to open it.
- * Output: HTML String (<details data-lz="...">...</details>).
+ * Creates a collapsible <details> element whose inner DOM is deferred until opened.
+ * Output: HTML String.
  */
 const lazy = (summary, build, open, cls, style) => {
   const id = 'lz' + (lzId++);
@@ -338,8 +338,8 @@ const lazy = (summary, build, open, cls, style) => {
 };
 
 /**
- * Populates a lazy <details> container when opened, chunking large arrays across animation frames to prevent UI freezes.
- * Output: None (mutates DOM inside the opened <details> element).
+ * Populates a deferred <details> element when opened, chunking array items 25 per frame.
+ * Output: None (mutates DOM).
  */
 function fillLazy(d) {
   const id = d.dataset.lz, b = LZ[id];
@@ -357,12 +357,11 @@ function fillLazy(d) {
     i += 25;
     if (i < out.length) requestAnimationFrame(next);
   };
-  requestAnimationFrame(next);
+  next();
 }
 
 /**
- * Builds the collapsible "Full working" section containing all row-operation snapshots on [A | I].
- * Kept collapsed by default (false) so initial render stays fast and lag-free.
+ * Builds the collapsible "Full working" drawer for Step 2. Kept collapsed by default (false) to prevent UI lag.
  * Output: HTML String.
  */
 function stepsHTML(r, f) {
@@ -373,8 +372,8 @@ function stepsHTML(r, f) {
   return lazy(
     `Full working: every ${r.mode === 'exact' ? 'row operation' : 'pivot column'} on [A | I] (${S.length - 1} step${S.length === 2 ? '' : 's'})`,
     () => [
-      ...(S.length > 1 && !S[1].M ? ['<p class="mut">Above 40x40 only the pivot choices are listed: a table for every step would hold millions of numbers.</p>'] : []),
-      ...S.map((s, i) => `<div class="st"><div class="lab"><span class="sn">${i || '0'}</span> ${esc(s.t)}</div>${s.M ? aug(s.M, fs, r.n, s.hi) : ''}</div>`)
+      ...(S.length > 1 && !S[1].M ? ['<p class="mut">Above 40×40 only the pivot choices are listed: a table for every step would hold millions of numbers.</p>'] : []),
+      ...S.map((s, i) => `<div class="st"><div class="lab"><span class="sn">${i || '▶'}</span> ${esc(s.t)}</div>${s.M ? aug(s.M, fs, r.n, s.hi) : ''}</div>`)
     ],
     false,
     'steps',
@@ -383,19 +382,10 @@ function stepsHTML(r, f) {
 }
 
 /**
- * Formats the system of linear equations into human-readable algebra lines (e.g., "2x + y − z = 8").
+ * Formats the linear system into algebraic equation strings (e.g., "2x + y − z = 8").
  * Output: Array of Strings.
  */
-const eqLines = (A, B) => A.map(row => {
-  const t = row.map((v, j) => ({ v, j }))
-    .filter(o => !isZ(o.v))
-    .map((o, k) => {
-      const neg = o.v.n < 0n, a = neg ? fr(-o.v.n, o.v.d) : o.v;
-      return (neg ? '− ' : (k ? '+ ' : '')) + (isOne(a) ? '' : str(a)) + xn(o.j, A.length);
-    }).join(' ') || '0';
-  return `${t} = ${str(B[row.indexOf ? A.indexOf(row) : 0])}`;
-}).map((_, i) => {
-  const row = A[i];
+const eqLines = (A, B) => A.map((row, i) => {
   const t = row.map((v, j) => ({ v, j }))
     .filter(o => !isZ(o.v))
     .map((o, k) => {
@@ -406,15 +396,15 @@ const eqLines = (A, B) => A.map(row => {
 });
 
 /**
- * Generates HTML list items showing the exact dot-product arithmetic for each entry of P * Q.
- * Output: HTML String of <li> elements.
+ * Builds HTML list items showing exact entry-by-entry dot products of P * Q.
+ * Output: HTML String.
  */
 const dotWork = (P, Q, f, labelFn) => P.map((row, i) => Q[0].map((_, j) =>
   `<li>${labelFn(i, j)} = ${row.map((p, k) => `(${f(p)})(${f(Q[k][j])})`).join(' + ')} = <b>${str(row.reduce((s, p, k) => add(s, mul(p, Q[k][j])), ZERO))}</b></li>`
 ).join('')).join('');
 
 /**
- * Generates an array of HTML strings showing floating-point dot-product arithmetic for P * Q.
+ * Builds an array of HTML strings showing floating-point entry-by-entry dot products of P * Q.
  * Output: Array of HTML Strings.
  */
 const dotWorkF = (P, Q, labelFn) => P.flatMap((row, i) => Q[0].map((_, j) =>
@@ -422,7 +412,7 @@ const dotWorkF = (P, Q, labelFn) => P.flatMap((row, i) => Q[0].map((_, j) =>
 ));
 
 /**
- * Computes Step 5 verification checks locally when running in offline browser mode.
+ * Computes Step 5 verification checks locally when running offline.
  * Output: Object {rows, okL, okR, okI}.
  */
 function localVer(r) {
@@ -446,98 +436,86 @@ function localVer(r) {
 }
 
 /**
- * Builds the HTML card for Step 5 (Verification checklist and equation substitution table).
- * Output: HTML String (<section class="card span">...</section>).
+ * Renders Step 5 (Verification checklist and equation substitution table).
+ * Output: HTML String.
  */
 function verifyHTML(r) {
   const ex = r.mode === 'exact', n = r.n, V = r.ver || localVer(r);
   const { rows, okL, okR, okI } = V;
   const hits = rows.filter(q => q.ok).length, hasW = rows.some(q => q.w);
   const items = [
-    [true, ex ? 'A is invertible: det(A) != 0' : 'A is invertible: a pivot was found in every column'],
+    [true, ex ? 'A is invertible: det(A) ≠ 0' : 'A is invertible: a pivot was found in every column'],
     [hits === n, `Substituting x into the equations gives Ax = B (${hits} of ${n} equations match)`],
     [okL, 'A⁻¹A = Iₙ'],
     [okR, 'AA⁻¹ = Iₙ'],
     [okI, 'Iₙx = x: the identity leaves the solution unchanged']
   ];
   const all = items.every(q => q[0]);
-  return `<section class="card span"><h2><span class="n">5</span>Verification</h2>
-    <ul class="chk">${items.map(q => `<li class="${q[0] ? 'ok' : 'bad'}">[${q[0] ? 'OK' : 'FAIL'}]${q[1]}</li>`).join('')}</ul>
-    <p class="big ${all ? 'ok' : 'bad'}">${all ? 'The solution is valid and the identity matrix stays the same.' : 'Verification failed. ' + (r.cond > 1e8 ? 'The matrix is ill-conditioned, so rounding error is too large for decimal arithmetic to confirm the answer.' : 'Recheck your entries.')}</p>
-    <details${n <= 4 ? ' open' : ''}><summary>Equation-by-equation substitution</summary><div class="box"><table class="vt"><tr><th>Row</th>${hasW ? '<th>Substitution</th>' : ''}<th>Sum aᵢⱼxⱼ</th><th>bᵢ</th><th>Status</th></tr>${rows.map((q, i) => `<tr><td>${i + 1}</td>${hasW ? `<td class="wk">${q.w}</td>` : ''}<td>${q.l}</td><td>${q.b}</td><td class="${q.ok ? 'ok' : 'bad'}">${q.ok ? 'OK' : 'FAIL'}</td></tr>`).join('')}</table></div></details></section>`;
+  return `<section class="card span"><h2><span class="n">5</span>Verification</h2><ul class="chk">${items.map(q => `<li class="${q[0] ? 'ok' : 'bad'}">${q[0] ? '✔' : '✘'} ${q[1]}</li>`).join('')}</ul>
+   <p class="big ${all ? 'ok' : 'bad'}">${all ? '✔ The solution is valid and the identity matrix stays the same.' : '✘ Verification failed. ' + (r.cond > 1e8 ? 'The matrix is ill-conditioned, so rounding error is too large for decimal arithmetic to confirm the answer.' : 'Recheck your entries.')}</p>
+   <details${n <= 4 ? ' open' : ''}><summary>Equation-by-equation substitution</summary><div class="box"><table class="vt"><tr><th>Row</th>${hasW ? '<th>Substitution</th>' : ''}<th>Σ aᵢⱼxⱼ</th><th>bᵢ</th><th></th></tr>${rows.map((q, i) => `<tr><td>${i + 1}</td>${hasW ? `<td class="wk">${q.w}</td>` : ''}<td>${q.l}</td><td>${q.b}</td><td class="${q.ok ? 'ok' : 'bad'}">${q.ok ? '✔' : '✘'}</td></tr>`).join('')}</table></div></details></section>`;
 }
 
 /**
- * Renders a matrix directly for n <= 24, or wraps it in a lazy <details> drawer for larger sizes.
+ * Renders matrix M directly when n <= 24, or inside a deferred <details> drawer when n > 24.
  * Output: HTML String.
  */
-const bm = (r, f, M, label) => r.n > MAX_N ? lazy(`Show ${label} (${r.n}x${r.n})`, () => mat(M, f), false) : mat(M, f);
+const bm = (r, f, M, label) => r.n > MAX_N ? lazy(`Show ${label} (${r.n}×${r.n})`, () => mat(M, f), false) : mat(M, f);
 
 /**
- * Builds the HTML rows displaying A^-1 * A = I and A * A^-1 = I in Step 3.
+ * Renders the visual matrix multiplication equations for Step 3.
  * Output: HTML String.
  */
 const checkRows = (r, f) => `<div class="row">${lab('A<sup>-1</sup>')}${bm(r, f, r.inv, 'A⁻¹')}${lab('×')}${lab('A')}${bm(r, f, r.A, 'A')}${lab('=')}${bm(r, f, r.left, 'A⁻¹A')}</div>
-  <div class="row" style="margin-top:12px">${lab('A')}${bm(r, f, r.A, 'A')}${lab('×')}${lab('A<sup>-1</sup>')}${bm(r, f, r.inv, 'A⁻¹')}${lab('=')}${bm(r, f, r.right, 'AA⁻¹')}</div>`;
+   <div class="row" style="margin-top:12px">${lab('A')}${bm(r, f, r.A, 'A')}${lab('×')}${lab('A<sup>-1</sup>')}${bm(r, f, r.inv, 'A⁻¹')}${lab('=')}${bm(r, f, r.right, 'AA⁻¹')}</div>`;
 
 /**
- * Master renderer that generates all 5 output cards from a solver result object r.
- * Output: Complete HTML String for #out.
+ * Master rendering function that builds Steps 1 through 5 as HTML cards.
+ * Output: HTML String.
  */
 function report(r) {
   LZ = {};
   lzId = 0;
   const n = r.n, f = r.mode === 'exact' ? str : fmtF, col = v => v.map(x => [x]);
   let h = `<section class="card span"><h2><span class="n">1</span>Matrix equation&nbsp; Ax = B</h2>
-    ${r.mode === 'exact' ? `<p class="eqt">${eqLines(r.A, r.B).join('<br>')}</p>` : ''}
-    <div class="row">${lab('A')}${bm(r, f, r.A, 'A')}${lab('X')}${mat(Array.from({ length: n }, (_, i) => [xn(i, n)]), f)}${lab('=')}${lab('B')}${mat(col(r.B), f)}</div></section>`;
-
+   ${r.mode === 'exact' ? `<p class="eqt">${eqLines(r.A, r.B).join('<br>')}</p>` : ''}
+   <div class="row">${lab('A')}${bm(r, f, r.A, 'A')}${lab('X')}${mat(Array.from({ length: n }, (_, i) => [xn(i, n)]), f)}${lab('=')}${lab('B')}${mat(col(r.B), f)}</div></section>`;
   if (!r.inv) {
     return h + `<section class="card span"><h2><span class="n">2</span>Inverse A<sup>-1</sup></h2>
-      <p class="bad">${r.mode === 'exact' ? 'A is singular (det A = 0), so A<sup>-1</sup> does not exist.' : 'A is singular, or so ill-conditioned that decimal arithmetic cannot invert it.'}</p>
-      <p>${r.why ? r.why + '. ' : ''}The inverse method cannot solve this system. Change a coefficient so the rows are independent, or solve it by row reduction instead.</p>${stepsHTML(r, f)}</section>`;
+     <p class="bad">${r.mode === 'exact' ? 'A is singular (det A = 0), so A<sup>-1</sup> does not exist.' : 'A is singular, or so ill-conditioned that decimal arithmetic cannot invert it.'}</p>
+     <p>${r.why ? r.why + '. ' : ''}The inverse method cannot solve this system. Change a coefficient so the rows are independent, or solve it by row reduction instead.</p>${stepsHTML(r, f)}</section>`;
   }
-
   h += `<section class="card span"><h2><span class="n">2</span>Identify the inverse A<sup>-1</sup></h2><div class="row">${lab('A<sup>-1</sup> =')}${bm(r, f, r.inv, 'A⁻¹')}</div>`;
-  if (r.mode === 'exact') {
-    h += `<p class="mut" style="margin:10px 0 0">det(A) = ${r.pivots ? `(−1)<sup>${r.swaps}</sup> ×${r.pivots.map(str).join(' × ')} = ` : ''}${str(r.det)}</p>${stepsHTML(r, f)}`;
-  } else {
-    h += `<p class="mut" style="margin:10px 0 0">Gauss-Jordan with partial pivoting in double precision, shown to 4 decimals. Condition number ≈ ${sci(r.cond)}.</p>` +
-      (r.cond > 1e8 ? `<p class="bad">This matrix is ill-conditioned, so the digits of A<sup>-1</sup> and x may be unreliable.</p>` : '') +
-      stepsHTML(r, f);
-  }
+  if (r.mode === 'exact') h += `<p class="mut" style="margin:10px 0 0">det(A) = ${r.pivots ? `(−1)<sup>${r.swaps}</sup> × ${r.pivots.map(str).join(' × ')} = ` : ''}${str(r.det)}</p>${stepsHTML(r, f)}`;
+  else h += `<p class="mut" style="margin:10px 0 0">Gauss–Jordan with partial pivoting in double precision, shown to 4 decimals. Condition number ≈ ${sci(r.cond)}.</p>` +
+    (r.cond > 1e8 ? `<p class="bad">This matrix is ill-conditioned, so the digits of A<sup>-1</sup> and x may be unreliable.</p>` : '');
+  if (r.mode === 'float') h += stepsHTML(r, f);
   h += `</section>`;
-
   h += `<section class="card${n > 5 ? ' span' : ''}"><h2><span class="n">3</span>Check&nbsp; A<sup>-1</sup>A = AA<sup>-1</sup> = I<sub>n</sub></h2>`;
-  if (r.mode === 'exact') {
-    h += `${checkRows(r, f)}${lazy('Show the multiplication work, entry by entry', () => `<p class="mut">A<sup>-1</sup>A</p><ul class="wl">${dotWork(r.inv, r.A, f, (i, j) => `(${i + 1},${j + 1})`)}</ul><p class="mut">AA<sup>-1</sup></p><ul class="wl">${dotWork(r.A, r.inv, f, (i, j) => `(${i + 1},${j + 1})`)}</ul>`, false)}`;
-  } else {
+  if (r.mode === 'exact') h += `${checkRows(r, f)}${lazy('Show the multiplication work, entry by entry', () => `<p class="mut">A<sup>-1</sup>A</p><ul class="wl">${dotWork(r.inv, r.A, f, (i, j) => `(${i + 1},${j + 1})`)}</ul><p class="mut">AA<sup>-1</sup></p><ul class="wl">${dotWork(r.A, r.inv, f, (i, j) => `(${i + 1},${j + 1})`)}</ul>`, false)}`;
+  else {
     h += `<p class="mut">Largest difference from the identity: A<sup>-1</sup>A is ${sci(r.e1)}, AA<sup>-1</sup> is ${sci(r.e2)}. Anything below 1e−6 counts as the identity.</p>`;
     h += n <= 15 ? checkRows(r, f) : `<div class="row">${lab('A<sup>-1</sup>')}${bm(r, f, r.inv, 'A⁻¹')}${lab('and')}${lab('A')}${bm(r, f, r.A, 'A')}</div>`;
-    if (n > SNAP_MAX) {
-      h += '<p class="mut">The entry-by-entry multiplication work is not shown above 40x40 (it would be millions of terms).</p>';
-    } else {
-      h += lazy('Show the multiplication work, entry by entry (values shown to 4 decimals)', () => ['<p class="mut">A<sup>-1</sup>A</p>', ...dotWorkF(r.inv, r.A, (i, j) => `(${i + 1},${j + 1})`), '<p class="mut">AA<sup>-1</sup></p>', ...dotWorkF(r.A, r.inv, (i, j) => `(${i + 1},${j + 1})`)], false, 'wl');
-    }
+    if (n > SNAP_MAX) h += '<p class="mut">The entry-by-entry multiplication work is not shown above 40×40 (it would be millions of terms).</p>';
+    else h += lazy('Show the multiplication work, entry by entry (values shown to 4 decimals)', () => ['<p class="mut">A<sup>-1</sup>A</p>', ...dotWorkF(r.inv, r.A, (i, j) => `(${i + 1},${j + 1})`), '<p class="mut">AA<sup>-1</sup></p>', ...dotWorkF(r.A, r.inv, (i, j) => `(${i + 1},${j + 1})`)], false, 'wl');
   }
-  h += `<p class="${r.ok ? 'ok' : 'bad'}">${r.ok ? '[OK] Both products equal the identity matrix.' : '[FAIL] A product is not the identity. ' + (r.cond > 1e8 ? 'The matrix is ill-conditioned, so decimal rounding error is too large to confirm it.' : 'Recheck your entries.')}</p></section>`;
-
+  h += `<p class="${r.ok ? 'ok' : 'bad'}">${r.ok ? '✔ Both products equal the identity matrix.' : '✘ A product is not the identity. ' + (r.cond > 1e8 ? 'The matrix is ill-conditioned, so decimal rounding error is too large to confirm it.' : 'Recheck your entries.')}</p></section>`;
   h += `<section class="card${n > 5 ? ' span' : ''}"><h2><span class="n">4</span>Solve&nbsp; [X] = A<sup>-1</sup>B</h2>
-    <div class="row">${lab('A<sup>-1</sup>')}${bm(r, f, r.inv, 'A⁻¹')}${lab('B')}${mat(col(r.B), f)}${lab('=')}${mat(r.x, f)}</div>
-    <div class="ans${n > 10 ? ' dense' : ''}">${r.x.map((v, i) => `<div>${xn(i, n)} = ${f(v[0])}${r.mode === 'exact' ? `<small>${dec(v[0]) || 'exact'}</small>` : ''}</div>`).join('')}</div>`;
+   <div class="row">${lab('A<sup>-1</sup>')}${bm(r, f, r.inv, 'A⁻¹')}${lab('B')}${mat(col(r.B), f)}${lab('=')}${mat(r.x, f)}</div>
+   <div class="ans${n > 10 ? ' dense' : ''}">${r.x.map((v, i) => `<div>${xn(i, n)} = ${f(v[0])}${r.mode === 'exact' ? `<small>${dec(v[0]) || 'exact'}</small>` : ''}</div>`).join('')}</div>`;
   if (r.mode === 'exact') h += `${lazy('Show how each x is computed: x = A<sup>-1</sup>B', () => `<ul class="wl">${dotWork(r.inv, col(r.B), f, i => xn(i, n))}</ul>`, false)}`;
   if (r.mode === 'float') h += `<p class="mut">Largest error of Ax − B: ${sci(r.res)}</p>`;
   return h + '</section>' + verifyHTML(r);
 }
 
-/* ---------- FastAPI Bridge ---------- */
+/* ---------- Bridge to the FastAPI Server (mc7_api.py) ---------- */
 
 const API = location.protocol.startsWith('http') ? '' : 'http://127.0.0.1:8000';
 let seq = 0, ctl = null, ctm;
 
 /**
- * Updates the top status pill to show whether the Python FastAPI backend is reachable.
- * Output: None (updates #api DOM element).
+ * Updates the connection status pill in the header.
+ * Output: None (mutates #api element).
  */
 const setApi = on => {
   const p = $('api');
@@ -547,8 +525,8 @@ const setApi = on => {
 };
 
 /**
- * Sends the current system {A, B, unlimited} to POST /api/solve on the FastAPI backend.
- * Output: Promise resolving to the parsed JSON response from the server.
+ * Sends the current system {A, B, unlimited} to POST /api/solve.
+ * Output: Promise resolving to JSON response object.
  */
 async function callAPI() {
   if (ctl) ctl.abort();
@@ -570,8 +548,8 @@ async function callAPI() {
 }
 
 /**
- * Converts string values returned by the Python API into BigInt fraction objects or Numbers for report().
- * Output: Formatted result Object matching solveExact/solveFloat structure.
+ * Deserializes string fractions or numbers from the Python API response into objects for report().
+ * Output: Solver result Object.
  */
 function fromAPI(j) {
   const exact = j.mode === 'exact', P = exact ? parseX : (v => v), PI = exact ? parseX : parseF;
@@ -591,8 +569,8 @@ function fromAPI(j) {
 }
 
 /**
- * Requests a random invertible system from GET /api/random, falling back to randomSys() if offline.
- * Output: Promise (loads the generated system into the UI).
+ * Requests a random invertible system from GET /api/random, or generates one locally if offline.
+ * Output: Promise.
  */
 async function randomFrom(n) {
   try {
@@ -605,28 +583,28 @@ async function randomFrom(n) {
   }
 }
 
-/* ---------- Input & State Management ---------- */
+/* ---------- Input Handling & State ---------- */
 
 /**
- * Parses a multi-line pasted text block into coefficient matrix A and constant vector B.
- * Output: Object {A, B} or {err: String} if dimensions are invalid.
+ * Parses pasted multiline text into matrix A and vector B.
+ * Output: Object {A, B} or {err: String}.
  */
 function parseText(t) {
   const rows = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => l.split(/[\s,;]+/).filter(Boolean));
   const m = rows.length;
   if (!m) return { err: 'Type or paste at least one equation.' };
-  if (m > LIMIT()) return { err: `That is ${m} equations. The maximum is ${LIMIT()}${UNLOCK ? '' : ' (tick "Remove the 24x24 limit" for more)'}.` };
+  if (m > LIMIT()) return { err: `That is ${m} equations. The maximum is ${LIMIT()}${UNLOCK ? '' : ' (tick "Remove the 24×24 limit" for more)'}.` };
   for (let i = 0; i < m; i++) {
     if (rows[i].length !== m + 1) {
-      return { err: `Line ${i + 1} has ${rows[i].length} numbers. A ${m}x${m} system needs ${m + 1} per line: the coefficients, then the constant.` };
+      return { err: `Line ${i + 1} has ${rows[i].length} numbers. A ${m}×${m} system needs ${m + 1} per line: the coefficients, then the constant.` };
     }
   }
   return { A: rows.map(r => r.slice(0, m)), B: rows.map(r => r[m]) };
 }
 
 /**
- * Generates a random invertible n x n system locally in the browser.
- * Output: Object {a: 2D Array of Numbers, b: Array of Numbers}.
+ * Generates a random invertible n x n system locally (unit LU for n <= 10; diagonally dominant for n > 10).
+ * Output: Object {a: 2D Array, b: Array}.
  */
 function randomSys(n) {
   const R = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
@@ -670,14 +648,14 @@ const PRESETS = {
 let N = 3, A = [], B = [], tmr;
 
 /**
- * Shorthand helper for document.getElementById(id).
+ * Shorthand selector for document.getElementById.
  * Output: DOM Element.
  */
 const $ = id => document.getElementById(id);
 
 /**
- * Resizes the system to n x n while preserving existing typed entries (new entries default to '0').
- * Output: None (updates state and triggers build()).
+ * Resizes the system to n x n while preserving existing entries.
+ * Output: None.
  */
 function setSize(n) {
   const nA = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (A[i] && A[i][j] !== undefined) ? A[i][j] : '0'));
@@ -687,7 +665,7 @@ function setSize(n) {
 }
 
 /**
- * Loads a preset or randomized system object {a, b} into state and rebuilds the UI.
+ * Loads a preset/random system {a, b} into state and rebuilds the grid.
  * Output: None.
  */
 function load(p) {
@@ -698,28 +676,29 @@ function load(p) {
 }
 
 /**
- * Synchronizes the optional paste <textarea> with the current grid values, only when the drawer is open.
+ * Updates the text-paste <textarea> to match the current matrix state.
+ * For large systems (N > MAX_N), skips updating unless the drawer is open.
  * Output: None.
  */
 function syncText() {
-  if (!$('textBox').open) return;
+  if (N > MAX_N && !$('textBox').open) return;
   $('txt').value = A.map((r, i) => r.concat(B[i]).join(' ')).join('\n');
 }
 
 /**
- * Escapes HTML special characters to prevent XSS or broken attributes.
+ * Escapes HTML special characters in user input strings.
  * Output: Safe HTML String.
  */
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /**
- * Builds the compact table grid HTML for systems with N > 4.
- * Output: HTML String (<table class="cg">...</table>).
+ * Generates the compact table grid HTML for systems with N > 4.
+ * Output: HTML String.
  */
 const gridHTML = () => `<table class="cg"><thead><tr>${A.map((_, j) => `<th>${xn(j)}</th>`).join('')}<th></th><th>B</th></tr></thead><tbody>${A.map((row, i) => '<tr>' + row.map((v, j) => `<td><input inputmode="decimal" aria-label="Row ${i + 1}, coefficient of ${xn(j)}" data-r="${i}" data-c="${j}" value="${esc(v)}"></td>`).join('') + `<td class="lab">=</td><td><input inputmode="decimal" aria-label="Row ${i + 1}, constant" data-r="${i}" data-c="b" value="${esc(B[i])}"></td></tr>`).join('')}</tbody></table>`;
 
 /**
- * Rebuilds the input form controls, size chips, and triggers a solve calculation.
+ * Rebuilds the UI controls, input grid, and triggers compute().
  * Output: None.
  */
 function build(skipText) {
@@ -732,7 +711,7 @@ function build(skipText) {
   $('mode').textContent = N <= EXACT_MAX ? 'Exact fractions' : 'Decimal, double precision';
 
   if (N > GRID_MAX) {
-    $('form').innerHTML = `<p class="hint">The grid is available up to ${GRID_MAX}x${GRID_MAX}. For ${N}x${N}, paste the system into the text box below, or press Randomize.</p>`;
+    $('form').innerHTML = `<p class="hint">The grid is available up to ${GRID_MAX}×${GRID_MAX}. For ${N}×${N}, paste the system into the text box below, or press Randomize.</p>`;
     $('textBox').open = true;
   } else if (N > EQ_STYLE) {
     $('form').innerHTML = gridHTML();
@@ -747,8 +726,7 @@ function build(skipText) {
 }
 
 /**
- * Validates all inputs, queries the FastAPI backend (or local solver fallback), and renders the solution cards.
- * Avoids redundant DOM attribute mutations to keep typing responsive.
+ * Validates all inputs, calls the FastAPI solver (or local fallback), and renders the solution into #out.
  * Output: Promise.
  */
 async function compute(force) {
@@ -786,7 +764,7 @@ async function compute(force) {
   } else if (!force) {
     seq++;
     if (ctl) ctl.abort();
-    $('out').innerHTML = '';$('solveHint').textContent = `${N}x${N} is a large system: press Solve to compute it. This can take a few seconds.`;
+    $('out').innerHTML = '';$('solveHint').textContent = `${N}×${N} is a large system: press Solve to compute it. This can take a few seconds.`;
     return;
   } else {
     $('out').innerHTML = '<p class="mut">Solving…</p>';
@@ -813,10 +791,7 @@ async function compute(force) {
       r = exact ? solveExact(pa, pb) : solveFloat(pa, pb);
     }
     if (mine === seq) {
-      requestAnimationFrame(() => {
-        if (mine !== seq) return;
-        $('out').innerHTML = report(r);$('out').querySelectorAll('details[data-lz][open]').forEach(fillLazy);
-      });
+      $('out').innerHTML = report(r);$('out').querySelectorAll('details[data-lz][open]').forEach(fillLazy);
     }
   } catch (e) {
     $('err').textContent = 'Something went wrong: ' + e.message;
@@ -826,7 +801,7 @@ async function compute(force) {
 }
 
 /**
- * Reads the text box contents and updates the grid when the user pastes or types in the textarea.
+ * Applies pasted text from the <textarea> to the matrix grid.
  * Output: None.
  */
 function fromText() {
@@ -841,8 +816,8 @@ function fromText() {
 }
 
 /**
- * Displays a confirmation modal dialog and awaits the user's choice.
- * Output: Promise resolving to Boolean (true if confirmed, false if cancelled).
+ * Displays the modal dialog and returns a Promise resolving to the user's choice.
+ * Output: Promise<Boolean>.
  */
 function askConfirm(title, bullets, okText) {
   return new Promise(res => {
@@ -876,7 +851,7 @@ if (typeof document !== 'undefined') {
   $('size').addEventListener('change', () => {
     let v = parseInt($('size').value, 10);
     if (!(v >= 1)) v = N;
-    $('sizeNote').textContent = v > LIMIT() ? `The maximum is ${LIMIT()}x${LIMIT()}${UNLOCK ? '' : ' (tick "Remove the 24x24 limit" for more)'}.` : '';
+    $('sizeNote').textContent = v > LIMIT() ? `The maximum is ${LIMIT()}×${LIMIT()}${UNLOCK ? '' : ' (tick "Remove the 24×24 limit" for more)'}.` : '';
     setSize(Math.min(v, LIMIT()));
   });
 
@@ -896,7 +871,7 @@ if (typeof document !== 'undefined') {
     if (el.dataset.c === 'b') B[i] = el.value;
     else A[i][+el.dataset.c] = el.value;
     clearTimeout(ctm);
-    ctm = setTimeout(() => { syncText(); compute(); }, 200);
+    ctm = setTimeout(() => { syncText(); compute(); }, 150);
   });
 
   $('textBox').addEventListener('toggle', () => {
@@ -905,7 +880,7 @@ if (typeof document !== 'undefined') {
 
   $('txt').addEventListener('input', () => {
     clearTimeout(tmr);
-    tmr = setTimeout(fromText, N > EXACT_MAX ? 250 : 120);
+    tmr = setTimeout(fromText, N > EXACT_MAX ? 250 : 0);
   });
 
   $('form').addEventListener('paste', e => {
@@ -928,16 +903,16 @@ if (typeof document !== 'undefined') {
     const box = $('unlock');
     if (box.checked) {
       const ok = await askConfirm('Remove the size limit?', [
-        '<b>The page can slow down or freeze.</b> A 100x100 system has 10,000 numbers and a 200x200 system has 40,000.',
-        '<b>Solving takes a few seconds.</b> Large systems are solved when you press <b>Solve</b>, not while you type.',
-        '<b>Less working is shown.</b> Above 40x40 you see the pivot choices instead of a table for every step, and big matrices stay collapsed until you open them.',
+        '<b>The page can slow down or freeze.</b> A 100×100 system has 10,000 numbers and a 200×200 system has 40,000.',
+        '<b>Solving takes a few seconds.</b> About 1 second for 100×100 and 2 to 10 seconds for 200×200, depending on your computer. Large systems are solved when you press <b>Solve</b>, not while you type.',
+        '<b>Less working is shown.</b> Above 40×40 you see the pivot choices instead of a table for every step, and big matrices stay collapsed until you open them.',
         '<b>Decimals only.</b> Rounding errors can build up, and the page warns you about matrices that are hard to invert.',
-        'The largest size is 200x200.'
+        'The largest size is 200×200.'
       ], 'Remove the limit');
       if (!ok) { box.checked = false; return; }
       UNLOCK = true;
     } else {
-      if (N > MAX_N && !(await askConfirm(`Go back to ${MAX_N}x${MAX_N}?`, [`Your ${N}x${N} system will be cut down to ${MAX_N}x${MAX_N}: the extra rows and columns are removed.`], 'Cut it down'))) {
+      if (N > MAX_N && !(await askConfirm(`Go back to ${MAX_N}×${MAX_N}?`, [`Your ${N}×${N} system will be cut down to ${MAX_N}×${MAX_N}: the extra rows and columns are removed.`], 'Cut it down'))) {
         box.checked = true;
         return;
       }
