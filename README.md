@@ -1,6 +1,19 @@
 # MACHINE-CHALLENGE-7-COMP3
 This repository holds the files for the Machine Challenge 7, it contains the API, .html, and .py. 
 
+10-17-26
+Refactor codebase, optimize UI/solver performance, and split static assets
+
+  1. Extract styles and scripts from the HTML into separate style.css and script.js files.
+  2. Secure the backend routing to prevent source code exposure and restrict access to local connections only.
+  3. Remove blurry glassmorphism effects and background glowing lights to eliminate GPU lag and improve presentation readability.
+  4. Consolidate duplicate CSS rules and organize the stylesheet into logical sections.
+  5. Speed up the core math engine by reusing pivot data to find the determinant and skipping unnecessary calculations.
+  6. Reduce server memory usage by eliminating duplicate data processing when sending the final answer.
+  7. Prevent browser lag by keeping large math tables collapsed by default and pausing background text updates while typing.
+  8. Fix input validation to accept fractions with negative bottom numbers (e.g., 3/-4), correct minus signs in scientific notation, and handle invalid random sizes.
+  9. Replace confusing shortcut code with clear function names and add standard documentation comments to every function across all files.
+
 10-15-26
 Refactor codebase, optimize UI/solver performance, and split static assets
 
