@@ -1,6 +1,9 @@
 # MACHINE-CHALLENGE-7-COMP3
 This repository holds the files for the Machine Challenge 7, it contains the API, .html, and .py. 
 
+10-18-26
+  1. All collapsible drawers have been brightened to enhance UI/UX visbility.
+
 10-17-26
 Refactor codebase, optimize UI/solver performance, and split static assets
 
