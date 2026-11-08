@@ -263,7 +263,7 @@ def build_html(res):
         f"{mat(res['inv'])}{mat(B)}<span>=</span>{mat(res['x'])}</div><p>Solution:{sol}</p></section>"
     )
     items = [
-        (True, "A is invertible: det(A) ≠ 0"),
+        (True, "A is invertible: a pivot was found in every column"),
         (all(q[2] for q in res["eq"]), "Substituting x into the equations gives Ax = B"),
         (res["okL"], "A<sup>-1</sup>A = I<sub>n</sub>"),
         (res["okR"], "AA<sup>-1</sup> = I<sub>n</sub>"),
@@ -305,4 +305,32 @@ def random_system(n, limit=MAX_N):
     else:
         A = [[F(R(-9, 9)) for _ in range(n)] for _ in range(n)]
         for i in range(n):
-            A[i][i] = sum(abs(v) for v in A[i]) - abs(A[i][i]) + 1 + R
+            A[i][i] = sum(abs(v) for v in A[i]) - abs(A[i][i]) + 1 + R(0, 5)
+    B = [[sum(A[i][j] * x[j] for j in range(n))] for i in range(n)]
+    return A, B
+
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    if "--input" in args:
+        n = int(input(f"Enter system size n (1-{MAX_N}): "))
+        A, B = [], []
+        print("Enter each equation's coefficients followed by the constant (space-separated):")
+        for i in range(n):
+            parts = [F(tok) for tok in input(f"Row {i + 1}: ").split()]
+            if len(parts) != n + 1:
+                raise ValueError(f"Expected {n + 1} numbers on row {i + 1}.")
+            A.append(parts[:n])
+            B.append([parts[n]])
+    elif "--random" in args:
+        idx = args.index("--random")
+        n = int(args[idx + 1]) if idx + 1 < len(args) and args[idx + 1].isdigit() else random.randint(2, MAX_N)
+        A, B = random_system(n)
+    else:
+        A = [[F(2), F(1), F(-1)], [F(-3), F(-1), F(2)], [F(-2), F(1), F(2)]]
+        B = [[F(8)], [F(-11)], [F(-3)]]
+
+    res = solve_with_inverse(A, B)
+    out_path = Path(__file__).parent / "mc7_report.html"
+    out_path.write_text(build_html(res), encoding="utf-8")
+    print(f"Report written to {out_path}")

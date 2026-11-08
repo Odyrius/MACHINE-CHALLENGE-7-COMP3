@@ -440,11 +440,11 @@ function localVer(r) {
  * Output: HTML String.
  */
 function verifyHTML(r) {
-  const ex = r.mode === 'exact', n = r.n, V = r.ver || localVer(r);
+  const n = r.n, V = r.ver || localVer(r);
   const { rows, okL, okR, okI } = V;
   const hits = rows.filter(q => q.ok).length, hasW = rows.some(q => q.w);
   const items = [
-    [true, ex ? 'A is invertible: det(A) ≠ 0' : 'A is invertible: a pivot was found in every column'],
+    [true, 'A is invertible: a pivot was found in every column'],
     [hits === n, `Substituting x into the equations gives Ax = B (${hits} of ${n} equations match)`],
     [okL, 'A⁻¹A = Iₙ'],
     [okR, 'AA⁻¹ = Iₙ'],
@@ -482,11 +482,11 @@ function report(r) {
    <div class="row">${lab('A')}${bm(r, f, r.A, 'A')}${lab('X')}${mat(Array.from({ length: n }, (_, i) => [xn(i, n)]), f)}${lab('=')}${lab('B')}${mat(col(r.B), f)}</div></section>`;
   if (!r.inv) {
     return h + `<section class="card span"><h2><span class="n">2</span>Inverse A<sup>-1</sup></h2>
-     <p class="bad">${r.mode === 'exact' ? 'A is singular (det A = 0), so A<sup>-1</sup> does not exist.' : 'A is singular, or so ill-conditioned that decimal arithmetic cannot invert it.'}</p>
+     <p class="bad">${r.mode === 'exact' ? 'A is singular (no pivot in every column), so A<sup>-1</sup> does not exist.' : 'A is singular, or so ill-conditioned that decimal arithmetic cannot invert it.'}</p>
      <p>${r.why ? r.why + '. ' : ''}The inverse method cannot solve this system. Change a coefficient so the rows are independent, or solve it by row reduction instead.</p>${stepsHTML(r, f)}</section>`;
   }
   h += `<section class="card span"><h2><span class="n">2</span>Identify the inverse A<sup>-1</sup></h2><div class="row">${lab('A<sup>-1</sup> =')}${bm(r, f, r.inv, 'A⁻¹')}</div>`;
-  if (r.mode === 'exact') h += `<p class="mut" style="margin:10px 0 0">det(A) = ${r.pivots ? `(−1)<sup>${r.swaps}</sup> × ${r.pivots.map(str).join(' × ')} = ` : ''}${str(r.det)}</p>${stepsHTML(r, f)}`;
+  if (r.mode === 'exact') h += stepsHTML(r, f);
   else h += `<p class="mut" style="margin:10px 0 0">Gauss–Jordan with partial pivoting in double precision, shown to 4 decimals. Condition number ≈ ${sci(r.cond)}.</p>` +
     (r.cond > 1e8 ? `<p class="bad">This matrix is ill-conditioned, so the digits of A<sup>-1</sup> and x may be unreliable.</p>` : '');
   if (r.mode === 'float') h += stepsHTML(r, f);
@@ -556,7 +556,7 @@ function fromAPI(j) {
   const cv = M => M && M.map(r => r.map(P));
   const r = { ...j, A: A.map(r => r.map(PI)), B: B.map(PI), inv: cv(j.inv), left: cv(j.left), right: cv(j.right), x: cv(j.x), steps: j.steps };
   if (exact) {
-    r.det = parseX(j.det);
+    r.det = j.det ? parseX(j.det) : null;
     r.pivots = j.pivots && j.pivots.map(parseX);
   }
   if (j.ver) {
@@ -704,7 +704,8 @@ const gridHTML = () => `<table class="cg"><thead><tr>${A.map((_, j) => `<th>${xn
 function build(skipText) {
   $('size').value = N;
   $('layout').classList.toggle('side', N <= EQ_STYLE);
-  $('size').max = LIMIT();$('unlock').checked = UNLOCK;
+  $('size').max = LIMIT();
+  $('unlock').checked = UNLOCK;
   document.querySelectorAll('#chips .big').forEach(b => { b.hidden = !UNLOCK; });
   $('solveBar').hidden = !(N > MAX_N);
   document.querySelectorAll('#chips button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.n === N)));
@@ -764,7 +765,8 @@ async function compute(force) {
   } else if (!force) {
     seq++;
     if (ctl) ctl.abort();
-    $('out').innerHTML = '';$('solveHint').textContent = `${N}×${N} is a large system: press Solve to compute it. This can take a few seconds.`;
+    $('out').innerHTML = '';
+    $('solveHint').textContent = `${N}×${N} is a large system: press Solve to compute it. This can take a few seconds.`;
     return;
   } else {
     $('out').innerHTML = '<p class="mut">Solving…</p>';
@@ -791,7 +793,8 @@ async function compute(force) {
       r = exact ? solveExact(pa, pb) : solveFloat(pa, pb);
     }
     if (mine === seq) {
-      $('out').innerHTML = report(r);$('out').querySelectorAll('details[data-lz][open]').forEach(fillLazy);
+      $('out').innerHTML = report(r);
+      $('out').querySelectorAll('details[data-lz][open]').forEach(fillLazy);
     }
   } catch (e) {
     $('err').textContent = 'Something went wrong: ' + e.message;
@@ -830,12 +833,13 @@ function askConfirm(title, bullets, okText) {
     const key = e => { if (e.key === 'Escape') done(false); };
     const done = v => {
       m.hidden = true;
-      $('mOk').onclick =$('mCancel').onclick = m.onclick = null;
+      $('mOk').onclick = $('mCancel').onclick = m.onclick = null;
       document.removeEventListener('keydown', key);
       res(v);
     };
     document.addEventListener('keydown', key);
-    $('mOk').onclick = () => done(true);$('mCancel').onclick = () => done(false);
+    $('mOk').onclick = () => done(true);
+    $('mCancel').onclick = () => done(false);
     m.onclick = e => { if (e.target === m) done(false); };
   });
 }
