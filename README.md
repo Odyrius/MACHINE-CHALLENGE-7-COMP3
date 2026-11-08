@@ -1,6 +1,13 @@
 # MACHINE-CHALLENGE-7-COMP3
 This repository holds the files for the Machine Challenge 7, it contains the API, .html, and .py. 
 
+11-08-26 Remove determinant display to align with rubric
+
+  1. Remove the determinant formula and result from the Step 2 display in both the interactive web frontend (script.js) and the static HTML report generator (mc7_matrix_inverse.py).
+  2. Update the singular matrix error message in Step 2 to state "no pivot in every column" instead of referencing a zero determinant.
+  3. Change the Step 5 verification checklist to confirm matrix invertibility based on finding a pivot in every column rather than checking if det(A) ≠ 0.
+  4. Retain determinant computations in the backend logic to preserve internal mathematical validation and algorithmic stability without exposing the output to the user.
+
 10-18-26
   1. All collapsible drawers have been brightened to enhance UI/UX visbility.
 
